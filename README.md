@@ -4,6 +4,8 @@ Cinematic website prototype for Munadi Hope Center.
 
 Phase 1 is complete: the project now has organized asset folders, protected original GLB files, optimized GLB outputs, and documentation for the next build phase.
 
+Phase 2 is complete: the prototype now uses one persistent Three.js canvas for a continuous scroll-controlled scene-blocking pass.
+
 ## Project Structure
 
 ```text
@@ -58,6 +60,35 @@ The optimized GLBs use meshopt compression and WebP textures. The future Three.j
 - Avoid long pinned scroll traps on phones.
 - Keep real text as HTML, not as texture-only content.
 
+## Phase 2 Scene Blocking
+
+Current flow:
+
+1. Camera starts at the wooden church door.
+2. Camera moves through the entrance into the church aisle.
+3. Camera approaches the lectern.
+4. Hero text appears as HTML on the left while the lectern and closed Bible sit in the 3D scene.
+5. Camera pushes closer to the Bible.
+6. Closed Bible fades into the open Bible.
+7. The open Bible becomes the visual foundation for the next readable content layer.
+
+Implementation notes:
+
+- The canvas is fixed and persistent across the page, not boxed inside the hero.
+- Models are loaded from `public/assets/models/optimized/`.
+- The optimized files use meshopt compression, so the loader uses `MeshoptDecoder`.
+- Camera timeline points are named and commented in `src/main.js` for tuning.
+- Add `?debug=1` to the URL to show timeline percentage and scene beat labels.
+- Mobile skips the heavy church interior asset and uses a shorter/lighter environment path.
+- Important text stays in HTML overlays for accessibility and readability.
+
+Known Phase 2 limitations:
+
+- This is scene blocking only, not final cinematic polish.
+- The open Bible placement is intentionally rough and should be art-directed in Phase 3.
+- The unlit door/interior materials still need lighting/material treatment.
+- Pastor, Prayer Request, Visit, and final CTA sections are placeholders only.
+
 ## Model Optimization
 
 The local optimizer is installed with:
@@ -80,11 +111,11 @@ docs/asset-audit.md
 
 ## Next Implementation Phases
 
-1. Build a full-page 3D scene shell that can span the whole scroll journey.
-2. Add camera path sections: door, church interior, lectern, closed Bible, open Bible.
-3. Connect the scroll timeline while keeping all important text readable as HTML.
-4. Replace or adapt unlit model materials so lighting feels warm, sacred, and cinematic.
-5. Add mobile and reduced-motion fallbacks before polishing the final choreography.
+1. Art-direct the church lighting, shadows, fog, and material treatment.
+2. Tune the open Bible placement so the page spread becomes a calm readable surface.
+3. Design the Pastor, Prayer Request, Visit, and final CTA chapter overlays.
+4. Add static image fallbacks for reduced-motion and low-power mobile devices.
+5. Polish the full scroll choreography after the content chapters are approved.
 
 ## GitHub Target
 
