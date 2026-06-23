@@ -83,6 +83,23 @@ h1 {
   margin-top: 1rem;
 }
 
+.preset-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.45rem;
+}
+
+.preset-row button {
+  min-height: 34px;
+  border: 1px solid rgba(241, 210, 122, 0.42);
+  border-radius: 5px;
+  background: rgba(241, 210, 122, 0.12);
+  color: var(--gold-light);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
 label {
   display: grid;
   grid-template-columns: 7.2rem 1fr;
@@ -120,6 +137,36 @@ input[type="range"] {
   font-weight: 900;
 }
 
+.page-overlay-test {
+  position: fixed;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.15rem;
+  left: 50%;
+  top: 50%;
+  width: 460px;
+  max-width: calc(100vw - 2rem);
+  transform: translate3d(-50%, -50%, 0) rotate(var(--page-tilt, -10deg));
+  opacity: var(--page-overlay-opacity, 0);
+  pointer-events: none;
+}
+
+.page-text {
+  min-height: 118px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.85rem;
+  color: rgba(42, 25, 12, 0.96);
+  font-family: "Cormorant Garamond", serif;
+  font-size: clamp(1.15rem, 2vw, 1.65rem);
+  font-weight: 700;
+  line-height: 1.05;
+  text-align: center;
+  text-shadow: 0 1px 0 rgba(255, 248, 232, 0.54);
+}
+
 @media (max-width: 760px) {
   body {
     overflow: auto;
@@ -136,5 +183,9 @@ input[type="range"] {
     bottom: 0.75rem;
     width: auto;
     max-height: 45vh;
+  }
+
+  .page-overlay-test {
+    width: min(340px, calc(100vw - 1.5rem));
   }
 }

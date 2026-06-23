@@ -8,18 +8,61 @@ const ASSETS = {
   lectern: '/public/assets/models/optimized/lectern.glb',
 };
 
-const DEFAULTS = {
+const LOCKED_BOOK_TRANSFORM = {
+  position: [0, 2.03, 0.03],
+  rotation: [0, 0, 180],
+  scale: 0.32,
+};
+
+const LOCKED_LECTERN_TRANSFORM = {
+  position: [0, 0, 0],
+  rotation: [0, 0, 0],
+  targetHeight: 2.05,
+};
+
+const LOCKED_DECAL_TRANSFORM = {
   coverTarget: 'cover-l_36',
   coverFace: -1,
-  book: {
-    position: [0, 2.03, 0.03],
-    rotation: [0, 0, 180],
-    scale: 0.32,
+  position: [0, 0, 0],
+  rotation: [0, 0, 0],
+  scale: [1.02, 1.02],
+};
+
+const OPEN_CLIP_TIME_RATIO = 0.5;
+
+const CAMERA_PRESETS = {
+  hero_view: {
+    position: [2.35, 4.55, 3.45],
+    target: [0, 2.02, 0],
+    fov: 38,
   },
+  cover_closeup: {
+    position: [0.95, 2.95, 1.25],
+    target: [0, 2.06, 0.02],
+    fov: 30,
+  },
+  open_pages_view: {
+    position: [0.12, 3.32, 0.48],
+    target: [0, 2.08, 0.02],
+    fov: 24,
+  },
+};
+
+const PAGE_ANCHORS = [
+  new THREE.Vector3(-1.92, -0.46, -1.13),
+  new THREE.Vector3(1.92, -0.46, -1.13),
+  new THREE.Vector3(-1.92, -0.46, 1.13),
+  new THREE.Vector3(1.92, -0.46, 1.13),
+];
+
+const DEFAULTS = {
+  coverTarget: LOCKED_DECAL_TRANSFORM.coverTarget,
+  coverFace: LOCKED_DECAL_TRANSFORM.coverFace,
+  book: structuredClone(LOCKED_BOOK_TRANSFORM),
   decal: {
-    position: [0, 0, 0],
-    rotation: [0, 0, 0],
-    scale: [1.02, 1.02],
+    position: [...LOCKED_DECAL_TRANSFORM.position],
+    rotation: [...LOCKED_DECAL_TRANSFORM.rotation],
+    scale: [...LOCKED_DECAL_TRANSFORM.scale],
   },
 };
 
@@ -39,12 +82,20 @@ scene.background = new THREE.Color('#140604');
 scene.fog = new THREE.FogExp2('#140604', 0.035);
 
 const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 80);
-camera.position.set(2.35, 4.55, 3.45);
+camera.position.fromArray(CAMERA_PRESETS.hero_view.position);
 
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 2.02, 0);
+controls.target.fromArray(CAMERA_PRESETS.hero_view.target);
 controls.enableDamping = true;
 controls.maxPolarAngle = Math.PI * 0.49;
+
+const cameraGoal = {
+  position: new THREE.Vector3().fromArray(CAMERA_PRESETS.hero_view.position),
+  target: new THREE.Vector3().fromArray(CAMERA_PRESETS.hero_view.target),
+  fov: CAMERA_PRESETS.hero_view.fov,
+};
+
+let currentOpenProgress = 0;
 
 scene.add(new THREE.HemisphereLight('#fff0cc', '#160604', 1.15));
 
@@ -83,6 +134,7 @@ let duration = 1;
 let decal = null;
 let currentCoverNode = null;
 let decalTexture = null;
+let pageSpread = null;
 let decalBase = {
   position: new THREE.Vector3(),
   rotation: new THREE.Euler(),
@@ -251,6 +303,110 @@ function makeCoverMaterial() {
   });
 }
 
+function createPageTexture(side) {
+  const width = 768;
+  const height = 1024;
+  const page = document.createElement('canvas');
+  page.width = width;
+  page.height = height;
+  const ctx = page.getContext('2d');
+  const base = ctx.createLinearGradient(0, 0, width, height);
+  base.addColorStop(0, '#fbefd0');
+  base.addColorStop(0.55, '#ead5a8');
+  base.addColorStop(1, '#d5b982');
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, width, height);
+
+  for (let i = 0; i < 3000; i += 1) {
+    const alpha = Math.random() * 0.055;
+    ctx.fillStyle = Math.random() > 0.5 ? `rgba(92,58,25,${alpha})` : `rgba(255,255,245,${alpha})`;
+    ctx.fillRect(Math.random() * width, Math.random() * height, Math.random() * 2.5, Math.random() * 1.7);
+  }
+
+  ctx.strokeStyle = 'rgba(108, 69, 28, 0.26)';
+  ctx.lineWidth = 2;
+  for (let y = 120; y < height - 110; y += 42) {
+    ctx.beginPath();
+    ctx.moveTo(side === 'left' ? 88 : 70, y);
+    ctx.lineTo(side === 'left' ? width - 72 : width - 92, y + Math.sin(y * 0.05) * 2);
+    ctx.stroke();
+  }
+
+  const spineShadow = ctx.createLinearGradient(side === 'left' ? width - 120 : 0, 0, side === 'left' ? width : 120, 0);
+  spineShadow.addColorStop(0, 'rgba(75, 43, 18, 0)');
+  spineShadow.addColorStop(1, 'rgba(75, 43, 18, 0.32)');
+  ctx.fillStyle = spineShadow;
+  ctx.fillRect(side === 'left' ? width - 150 : 0, 0, 150, height);
+
+  const texture = new THREE.CanvasTexture(page);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  return texture;
+}
+
+function createPageSpread() {
+  const group = new THREE.Group();
+  group.name = 'BookLabReadablePageSpread';
+  group.visible = false;
+  group.position.set(0, -0.41, 0.01);
+
+  const pageShape = new THREE.Shape();
+  const width = 1.84;
+  const height = 2.24;
+  const radius = 0.08;
+  pageShape.moveTo(-width / 2 + radius, -height / 2);
+  pageShape.lineTo(width / 2 - radius, -height / 2);
+  pageShape.quadraticCurveTo(width / 2, -height / 2, width / 2, -height / 2 + radius);
+  pageShape.lineTo(width / 2, height / 2 - radius);
+  pageShape.quadraticCurveTo(width / 2, height / 2, width / 2 - radius, height / 2);
+  pageShape.lineTo(-width / 2 + radius, height / 2);
+  pageShape.quadraticCurveTo(-width / 2, height / 2, -width / 2, height / 2 - radius);
+  pageShape.lineTo(-width / 2, -height / 2 + radius);
+  pageShape.quadraticCurveTo(-width / 2, -height / 2, -width / 2 + radius, -height / 2);
+
+  const geometry = new THREE.ShapeGeometry(pageShape, 18);
+  const leftMaterial = new THREE.MeshStandardMaterial({
+    map: createPageTexture('left'),
+    color: '#f2dfb6',
+    roughness: 0.96,
+    metalness: 0,
+    transparent: true,
+    opacity: 0,
+    depthTest: false,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const rightMaterial = leftMaterial.clone();
+  rightMaterial.map = createPageTexture('right');
+
+  const leftPage = new THREE.Mesh(geometry, leftMaterial);
+  leftPage.name = 'BookLabLeftReadablePage';
+  leftPage.position.set(-0.93, 0, 0);
+  leftPage.rotation.x = -Math.PI / 2;
+  leftPage.receiveShadow = true;
+  leftPage.renderOrder = 30;
+
+  const rightPage = new THREE.Mesh(geometry.clone(), rightMaterial);
+  rightPage.name = 'BookLabRightReadablePage';
+  rightPage.position.set(0.93, 0, 0);
+  rightPage.rotation.x = -Math.PI / 2;
+  rightPage.receiveShadow = true;
+  rightPage.renderOrder = 30;
+
+  const crease = new THREE.Mesh(
+    new THREE.BoxGeometry(0.035, 0.018, 2.16),
+    new THREE.MeshStandardMaterial({ color: '#b8894f', roughness: 0.9, transparent: true, opacity: 0 }),
+  );
+  crease.name = 'BookLabPageCrease';
+  crease.position.set(0, 0.012, 0);
+  crease.material.depthTest = false;
+  crease.material.depthWrite = false;
+  crease.renderOrder = 31;
+
+  group.add(leftPage, rightPage, crease);
+  return group;
+}
+
 function tuneBookMaterials(book) {
   const coverMaterial = makeCoverMaterial();
   book.traverse((child) => {
@@ -327,9 +483,9 @@ function attachDecalToCover(name) {
 }
 
 function applyBookTransform() {
-  bookRig.position.fromArray(state.book.position);
-  bookRig.rotation.set(...state.book.rotation.map(degToRad));
-  bookRig.scale.setScalar(state.book.scale);
+  bookRig.position.fromArray(LOCKED_BOOK_TRANSFORM.position);
+  bookRig.rotation.set(...LOCKED_BOOK_TRANSFORM.rotation.map(degToRad));
+  bookRig.scale.setScalar(LOCKED_BOOK_TRANSFORM.scale);
 }
 
 function applyDecalTransform() {
@@ -345,22 +501,86 @@ function applyDecalTransform() {
 
 function setAnimationProgress(value) {
   if (!mixer || !action) return;
-  const time = Number(value) * duration;
+  currentOpenProgress = THREE.MathUtils.clamp(Number(value), 0, 1);
+  const time = currentOpenProgress * duration * OPEN_CLIP_TIME_RATIO;
   action.enabled = true;
   action.paused = false;
   action.setEffectiveWeight(1);
   mixer.setTime(time);
   mixer.update(0);
+  updatePageOverlay();
+}
+
+function setCameraGoal(presetName, immediate = false) {
+  const preset = CAMERA_PRESETS[presetName];
+  if (!preset) return;
+
+  cameraGoal.position.fromArray(preset.position);
+  cameraGoal.target.fromArray(preset.target);
+  cameraGoal.fov = preset.fov;
+
+  if (immediate) {
+    camera.position.copy(cameraGoal.position);
+    controls.target.copy(cameraGoal.target);
+    camera.fov = cameraGoal.fov;
+    camera.updateProjectionMatrix();
+    updatePageOverlay();
+  }
+}
+
+function smoothstep(value) {
+  const t = THREE.MathUtils.clamp(value, 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
+function mixPreset(fromName, toName, t) {
+  const from = CAMERA_PRESETS[fromName];
+  const to = CAMERA_PRESETS[toName];
+  const eased = smoothstep(t);
+  cameraGoal.position.fromArray(from.position).lerp(new THREE.Vector3().fromArray(to.position), eased);
+  cameraGoal.target.fromArray(from.target).lerp(new THREE.Vector3().fromArray(to.target), eased);
+  cameraGoal.fov = THREE.MathUtils.lerp(from.fov, to.fov, eased);
+}
+
+function setSequenceProgress(value) {
+  const progress = THREE.MathUtils.clamp(Number(value), 0, 1);
+  let openProgress = 0;
+
+  if (progress < 0.34) {
+    mixPreset('hero_view', 'cover_closeup', progress / 0.34);
+  } else if (progress < 0.72) {
+    setCameraGoal('cover_closeup');
+    openProgress = (progress - 0.34) / 0.38;
+  } else {
+    openProgress = 1;
+    mixPreset('cover_closeup', 'open_pages_view', (progress - 0.72) / 0.28);
+  }
+
+  const animationInput = document.getElementById('animationProgress');
+  if (animationInput) animationInput.value = String(openProgress);
+  setAnimationProgress(openProgress);
+}
+
+function updateCamera() {
+  camera.position.lerp(cameraGoal.position, 0.09);
+  controls.target.lerp(cameraGoal.target, 0.09);
+  camera.fov += (cameraGoal.fov - camera.fov) * 0.09;
+  camera.updateProjectionMatrix();
+}
+
+function updatePageSpread(opacity = smoothstep((currentOpenProgress - 0.8) / 0.2)) {
+  if (!pageSpread) return;
+  pageSpread.visible = opacity > 0.01;
+  pageSpread.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+    child.material.opacity = opacity;
+    child.material.needsUpdate = true;
+  });
 }
 
 function syncInputs() {
   document.querySelectorAll('[data-bind]').forEach((input) => {
     const [group, prop, axis] = input.dataset.bind.split('.');
-    if (group === 'book') {
-      if (prop === 'position') input.value = state.book.position[{ x: 0, y: 1, z: 2 }[axis]];
-      if (prop === 'rotation') input.value = state.book.rotation[{ x: 0, y: 1, z: 2 }[axis]];
-      if (prop === 'scale') input.value = state.book.scale;
-    }
     if (group === 'decal') {
       if (prop === 'position') input.value = state.decal.position[{ x: 0, y: 1, z: 2 }[axis]];
       if (prop === 'rotation') input.value = state.decal.rotation[{ x: 0, y: 1, z: 2 }[axis]];
@@ -372,6 +592,28 @@ function syncInputs() {
 function setupControls() {
   document.getElementById('animationProgress').addEventListener('input', (event) => {
     setAnimationProgress(event.target.value);
+  });
+
+  document.getElementById('sequenceProgress').addEventListener('input', (event) => {
+    setSequenceProgress(event.target.value);
+  });
+
+  document.querySelectorAll('[data-camera-preset]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const preset = button.dataset.cameraPreset;
+      const animationInput = document.getElementById('animationProgress');
+      const sequenceInput = document.getElementById('sequenceProgress');
+
+      setCameraGoal(preset);
+      if (preset === 'open_pages_view') {
+        if (animationInput) animationInput.value = '1';
+        setAnimationProgress(1);
+      } else {
+        if (animationInput) animationInput.value = '0';
+        setAnimationProgress(0);
+      }
+      if (sequenceInput) sequenceInput.value = preset === 'open_pages_view' ? '1' : '0';
+    });
   });
 
   document.getElementById('coverTarget').addEventListener('change', (event) => {
@@ -388,12 +630,6 @@ function setupControls() {
     input.addEventListener('input', () => {
       const value = Number(input.value);
       const [group, prop, axis] = input.dataset.bind.split('.');
-      if (group === 'book') {
-        if (prop === 'position') state.book.position[{ x: 0, y: 1, z: 2 }[axis]] = value;
-        if (prop === 'rotation') state.book.rotation[{ x: 0, y: 1, z: 2 }[axis]] = value;
-        if (prop === 'scale') state.book.scale = value;
-        applyBookTransform();
-      }
       if (group === 'decal') {
         if (prop === 'position') state.decal.position[{ x: 0, y: 1, z: 2 }[axis]] = value;
         if (prop === 'rotation') state.decal.rotation[{ x: 0, y: 1, z: 2 }[axis]] = value;
@@ -411,10 +647,11 @@ function printValues() {
   const payload = {
     coverTarget: state.coverTarget,
     coverFace: state.coverFace,
+    lectern: structuredClone(LOCKED_LECTERN_TRANSFORM),
     book: {
-      position: toFixedArray(state.book.position),
-      rotation: toFixedArray(state.book.rotation),
-      scale: Number(state.book.scale.toFixed(4)),
+      position: toFixedArray(LOCKED_BOOK_TRANSFORM.position),
+      rotation: toFixedArray(LOCKED_BOOK_TRANSFORM.rotation),
+      scale: Number(LOCKED_BOOK_TRANSFORM.scale.toFixed(4)),
     },
     decal: {
       position: toFixedArray(state.decal.position),
@@ -422,10 +659,46 @@ function printValues() {
       scale: toFixedArray(state.decal.scale),
       parent: currentCoverNode?.name || null,
     },
+    cameraPresets: structuredClone(CAMERA_PRESETS),
+    openClipTimeRatio: OPEN_CLIP_TIME_RATIO,
     animationProgress: Number(document.getElementById('animationProgress').value),
   };
   console.info('[BookLab] final transform values', payload);
   setStatus('Printed final transform values to console.');
+}
+
+function updatePageOverlay() {
+  const overlay = document.getElementById('pageOverlayTest');
+  if (!overlay || !bookRig) return;
+
+  const opacity = smoothstep((currentOpenProgress - 0.82) / 0.18);
+  updatePageSpread(opacity);
+  overlay.style.setProperty('--page-overlay-opacity', opacity.toFixed(3));
+
+  if (opacity <= 0.001) return;
+
+  bookRig.updateWorldMatrix(true, true);
+  const points = PAGE_ANCHORS.map((point) => bookRig.localToWorld(point.clone()).project(camera));
+  const visible = points.every((point) => point.z > -1 && point.z < 1);
+  if (!visible) {
+    overlay.style.setProperty('--page-overlay-opacity', '0');
+    return;
+  }
+
+  const xs = points.map((point) => (point.x * 0.5 + 0.5) * window.innerWidth);
+  const ys = points.map((point) => (-point.y * 0.5 + 0.5) * window.innerHeight);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const width = THREE.MathUtils.clamp(maxX - minX, 260, Math.min(680, window.innerWidth - 32));
+  const height = THREE.MathUtils.clamp(maxY - minY, 118, Math.min(260, window.innerHeight * 0.34));
+
+  overlay.style.left = `${(minX + maxX) / 2}px`;
+  overlay.style.top = `${(minY + maxY) / 2}px`;
+  overlay.style.width = `${width}px`;
+  overlay.style.minHeight = `${height}px`;
+  overlay.style.setProperty('--page-tilt', '-7deg');
 }
 
 async function init() {
@@ -440,7 +713,9 @@ async function init() {
   ]);
 
   const lectern = lecternGltf.scene;
-  normalizeToGround(lectern, 2.05);
+  normalizeToGround(lectern, LOCKED_LECTERN_TRANSFORM.targetHeight);
+  lectern.position.fromArray(LOCKED_LECTERN_TRANSFORM.position);
+  lectern.rotation.set(...LOCKED_LECTERN_TRANSFORM.rotation.map(degToRad));
   lectern.traverse((child) => {
     if (!child.isMesh) return;
     child.castShadow = true;
@@ -451,6 +726,8 @@ async function init() {
   animatedBook = bookGltf.scene;
   tuneBookMaterials(animatedBook);
   bookRig.add(animatedBook);
+  pageSpread = createPageSpread();
+  bookRig.add(pageSpread);
   applyBookTransform();
 
   mixer = new THREE.AnimationMixer(animatedBook);
@@ -479,7 +756,7 @@ async function init() {
   decal.renderOrder = 20;
   attachDecalToCover(state.coverTarget);
 
-  setStatus('Book lab ready. Adjust controls, then print final values.');
+  setStatus('Book lab ready. Book and lectern transforms are locked; use presets, opening slider, and sequence test.');
   console.info('[BookLab] animated book nodes', {
     coverCandidates: ['cover-r_35', 'cover-l_36'],
     animation: clip ? { name: clip.name, duration: clip.duration } : null,
@@ -495,7 +772,9 @@ function resize() {
 }
 
 function render() {
+  updateCamera();
   controls.update();
+  updatePageOverlay();
   renderer.render(scene, camera);
   requestAnimationFrame(render);
 }

@@ -41,15 +41,14 @@
             </select>
           </label>
 
-          <label>Animation progress <input id="animationProgress" type="range" min="0" max="1" step="0.001" value="0" /></label>
+          <div class="preset-row" aria-label="Camera presets">
+            <button type="button" data-camera-preset="hero_view">Hero</button>
+            <button type="button" data-camera-preset="cover_closeup">Cover</button>
+            <button type="button" data-camera-preset="open_pages_view">Pages</button>
+          </div>
 
-          <label>Book X <input data-bind="book.position.x" type="number" step="0.01" /></label>
-          <label>Book Y <input data-bind="book.position.y" type="number" step="0.01" /></label>
-          <label>Book Z <input data-bind="book.position.z" type="number" step="0.01" /></label>
-          <label>Book rot X <input data-bind="book.rotation.x" type="number" step="1" /></label>
-          <label>Book rot Y <input data-bind="book.rotation.y" type="number" step="1" /></label>
-          <label>Book rot Z <input data-bind="book.rotation.z" type="number" step="1" /></label>
-          <label>Book scale <input data-bind="book.scale" type="number" step="0.01" /></label>
+          <label>Animation open <input id="animationProgress" type="range" min="0" max="1" step="0.001" value="0" /></label>
+          <label>Sequence test <input id="sequenceProgress" type="range" min="0" max="1" step="0.001" value="0" /></label>
 
           <label>Decal X <input data-bind="decal.position.x" type="number" step="0.005" /></label>
           <label>Decal Y <input data-bind="decal.position.y" type="number" step="0.005" /></label>
@@ -64,6 +63,11 @@
         <button class="print-button" id="printValues" type="button">Print final values</button>
         <p class="status" id="status">Loading animated book...</p>
       </section>
+
+      <div class="page-overlay-test" id="pageOverlayTest" aria-hidden="true">
+        <div class="page-text left-page">Hope begins here.</div>
+        <div class="page-text right-page">You are welcome.</div>
+      </div>
     </main>
 
     <script type="importmap">
