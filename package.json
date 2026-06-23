@@ -1,0 +1,18 @@
+{
+  "name": "munadi-hope-center",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Munadi Hope Center cinematic website prototype asset pipeline.",
+  "scripts": {
+    "optimize:models": "pnpm run optimize:models:biblia && pnpm run optimize:models:open-bible && pnpm run optimize:models:lectern && pnpm run optimize:models:door && pnpm run optimize:models:interior",
+    "optimize:models:biblia": "gltf-transform optimize public/assets/models/original/biblia.glb public/assets/models/optimized/biblia.glb --compress meshopt --meshopt-level high --texture-compress webp --texture-size 2048",
+    "optimize:models:open-bible": "gltf-transform optimize public/assets/models/original/open_bible.glb public/assets/models/optimized/open_bible.glb --compress meshopt --meshopt-level high --texture-compress webp --texture-size 2048",
+    "optimize:models:lectern": "gltf-transform optimize public/assets/models/original/lectern.glb public/assets/models/optimized/lectern.glb --compress meshopt --meshopt-level high --texture-compress webp --texture-size 2048",
+    "optimize:models:door": "gltf-transform optimize public/assets/models/original/wooden_church_door.glb public/assets/models/optimized/wooden_church_door.glb --compress meshopt --meshopt-level high --texture-compress webp --texture-size 2048",
+    "optimize:models:interior": "gltf-transform optimize public/assets/models/original/st_bartholomew-the-less_interior.glb public/assets/models/optimized/st_bartholomew-the-less_interior.glb --compress meshopt --meshopt-level high --texture-compress webp --texture-size 2048"
+  },
+  "devDependencies": {
+    "@gltf-transform/cli": "^4.4.0",
+    "sharp": "^0.35.2"
+  }
+}
