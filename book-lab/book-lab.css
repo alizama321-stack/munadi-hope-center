@@ -1,0 +1,140 @@
+:root {
+  color-scheme: dark;
+  --gold: #d7a742;
+  --gold-light: #f1d27a;
+  --panel: rgba(24, 9, 5, 0.78);
+  --line: rgba(241, 210, 122, 0.28);
+  --cream: #fff8e8;
+  font-family: "Inter", sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 54% 32%, rgba(151, 82, 31, 0.34), transparent 34rem),
+    linear-gradient(135deg, #110503, #2a0d05 48%, #090302);
+  color: var(--cream);
+}
+
+.book-lab-shell {
+  position: fixed;
+  inset: 0;
+}
+
+#bookLabCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.lab-panel {
+  position: fixed;
+  left: clamp(1rem, 2.2vw, 1.6rem);
+  top: clamp(1rem, 2.2vw, 1.6rem);
+  z-index: 5;
+  width: min(340px, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(16px);
+}
+
+.eyebrow {
+  margin: 0 0 0.3rem;
+  color: var(--gold-light);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0;
+  font-family: "Cormorant Garamond", serif;
+  font-size: 2.2rem;
+  line-height: 0.95;
+}
+
+.lab-note,
+.status {
+  margin: 0.55rem 0 0;
+  color: rgba(255, 248, 232, 0.68);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.control-grid {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+label {
+  display: grid;
+  grid-template-columns: 7.2rem 1fr;
+  gap: 0.55rem;
+  align-items: center;
+  color: rgba(255, 248, 232, 0.78);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+input,
+select {
+  width: 100%;
+  min-height: 32px;
+  border: 1px solid rgba(241, 210, 122, 0.34);
+  border-radius: 5px;
+  background: rgba(255, 248, 232, 0.08);
+  color: var(--cream);
+  padding: 0.28rem 0.42rem;
+}
+
+input[type="range"] {
+  padding: 0;
+}
+
+.print-button {
+  width: 100%;
+  min-height: 40px;
+  margin-top: 0.85rem;
+  border: 1px solid rgba(241, 210, 122, 0.58);
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(241, 210, 122, 0.24), rgba(215, 167, 66, 0.12));
+  color: var(--gold-light);
+  cursor: pointer;
+  font-weight: 900;
+}
+
+@media (max-width: 760px) {
+  body {
+    overflow: auto;
+  }
+
+  .book-lab-shell {
+    min-height: 100vh;
+  }
+
+  .lab-panel {
+    left: 0.75rem;
+    right: 0.75rem;
+    top: auto;
+    bottom: 0.75rem;
+    width: auto;
+    max-height: 45vh;
+  }
+}
