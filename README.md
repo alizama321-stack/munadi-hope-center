@@ -100,10 +100,12 @@ Implementation notes:
 - Models are loaded from `public/assets/models/optimized/`.
 - The optimized files use meshopt compression, so the loader uses `MeshoptDecoder`.
 - Camera timeline points are named and commented in `src/main.js` for tuning.
-- `src/main.js` exposes easy scene constants for `lecternPosition`, `lecternRotation`, `lecternScale`, `closedBiblePosition`, `closedBibleRotation`, `closedBibleScale`, `openBiblePosition`, `openBibleRotation`, and `openBibleScale`.
-- The closed and open Bible models share one `bibleMount` group and matching transforms so the reveal happens in the same physical position on the lectern.
-- Public navigation no longer exposes prototype labels; debug labels and helper controls are hidden unless `?debug=1` is active.
-- Add `?debug=1` to the URL to show timeline percentage and scene beat labels.
+- `src/main.js` now uses a `LecternSurface` anchor and a child `BibleRig` so the closed and open Bible share the same physical anchor on the lectern.
+- The Bible GLBs are normalized with bounding-box inspection so width runs left/right, length runs front/back, and thickness runs up/down before local correction constants are applied.
+- Editable tuning constants include `lecternSurfacePosition`, `lecternSurfaceRotation`, `bibleRigPosition`, `bibleRigRotation`, `bibleRigScale`, `closedBibleLocalRotation`, `closedBibleLocalOffset`, `closedBibleScale`, `openBibleLocalRotation`, `openBibleLocalOffset`, and `openBibleScale`.
+- The opening beat uses a procedural hinged cover and fluttering page planes before fading to the open Bible model in the same `BibleRig` position.
+- Public navigation no longer exposes prototype labels; debug labels, the lectern surface helper grid, and calibration controls are hidden unless `?debug=1` is active.
+- Add `?debug=1` to the URL to show timeline percentage, scene beat labels, lectern surface grid, and the live BibleRig calibration panel. Press `P` or click `Print transforms` to log values to the console.
 - Mobile skips the heavy church interior asset and uses a shorter/lighter environment path.
 - Important text stays in HTML overlays for accessibility and readability.
 
