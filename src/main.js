@@ -18,39 +18,40 @@ const ASSETS = {
 // Scene transform constants for Phase 2 tuning.
 const SCENE_TUNING = {
   // The church interior's longest model axis is local X; rotate it so that axis becomes the world Z nave path.
-  interiorPosition: [0, 0, 0.1],
+  interiorPosition: [0, 0, 0],
   interiorRotation: [0, -Math.PI / 2, 0],
   interiorHeight: 5.2,
   doorPosition: [0, 0, 8.6],
   doorRotation: [0, 0, 0],
   doorHeight: 4.65,
-  lecternPosition: [0.12, 0, -6.35],
+  lecternPosition: [0, 0, -6.45],
   lecternRotation: [0, 0, 0],
-  lecternScale: 1.36,
-  biblePosition: [0, 1.91, 0.08],
-  bibleRotation: [0, 0, 0],
-  bibleScale: 1,
-  closedBibleFootprint: 0.84,
-  openBibleFootprint: 1.08,
+  lecternScale: 1.28,
+  closedBiblePosition: [0, 1.78, 0.06],
+  closedBibleRotation: [0, 0, 0],
+  closedBibleScale: 0.82,
+  openBiblePosition: [0, 1.78, 0.06],
+  openBibleRotation: [0, 0, 0],
+  openBibleScale: 0.82,
 };
 
 const cameraWaypoints = [
-  // door_entry: camera waits outside the main wooden entrance.
-  { name: 'door_entry', at: 0, camera: [0, 1.58, 11.8], target: [0, 1.48, 8.55] },
+  // entrance_pov: visitor POV outside the main wooden entrance.
+  { name: 'entrance_pov', at: 0, camera: [0, 1.58, 11.8], target: [0, 1.48, 8.55] },
   // aisle_start: camera crosses the threshold and aligns with the center aisle.
-  { name: 'aisle_start', at: 0.14, camera: [0, 1.58, 7.2], target: [0, 1.42, 2.2] },
+  { name: 'aisle_start', at: 0.14, camera: [0, 1.58, 6.9], target: [0, 1.42, 1.4] },
   // aisle_mid: camera travels straight down the central nave/hallway.
-  { name: 'aisle_mid', at: 0.32, camera: [0, 1.58, 2.35], target: [0, 1.34, -3.7] },
+  { name: 'aisle_mid', at: 0.32, camera: [0, 1.58, 1.9], target: [0, 1.34, -3.85] },
   // stage_approach: camera approaches the front/stage without cutting scenes.
-  { name: 'stage_approach', at: 0.5, camera: [0, 1.62, -2.7], target: [0.05, 1.42, -6.35] },
-  // lectern_hero: hero copy appears while lectern and closed Bible sit on the right.
-  { name: 'lectern_hero', at: 0.64, camera: [-2.45, 1.74, -4.42], target: [0.02, 1.72, -6.32] },
-  // bible_closeup: camera pushes toward the closed Bible cover.
-  { name: 'bible_closeup', at: 0.77, camera: [-0.72, 2.48, -5.16], target: [0, 2.08, -6.28] },
-  // bible_topdown: camera reaches a top-down view of the closed cover before reveal.
-  { name: 'bible_topdown', at: 0.87, camera: [0, 4.28, -6.35], target: [0, 2.04, -6.35] },
-  // open_pages: same physical mount, open Bible visible, HTML page overlay aligns to the spread.
-  { name: 'open_pages', at: 1, camera: [0, 4.32, -6.42], target: [0, 2.02, -6.35] },
+  { name: 'stage_approach', at: 0.5, camera: [0, 1.64, -2.85], target: [0, 1.44, -6.45] },
+  // lectern_stage: lectern is already placed on the front/stage and remains visible.
+  { name: 'lectern_stage', at: 0.64, camera: [-2.24, 1.76, -4.35], target: [0, 1.66, -6.45] },
+  // bible_cover_topdown: top-down view of the closed Bible cover on the lectern.
+  { name: 'bible_cover_topdown', at: 0.82, camera: [-0.14, 3.95, -6.18], target: [0, 1.94, -6.42] },
+  // bible_open_on_lectern: same lectern location, open model replaces closed model.
+  { name: 'bible_open_on_lectern', at: 0.91, camera: [0, 4.2, -6.42], target: [0, 1.92, -6.45] },
+  // bible_pages_content: HTML page overlays attach to the open spread.
+  { name: 'bible_pages_content', at: 1, camera: [0, 4.35, -6.5], target: [0, 1.92, -6.45] },
 ];
 
 function clamp(value, min = 0, max = 1) {
@@ -126,6 +127,14 @@ function tuneMaterials(object, options = {}) {
       material.envMapIntensity = options.envMapIntensity ?? 0.7;
       if ('roughness' in material) material.roughness = Math.max(material.roughness ?? 0.65, options.roughness ?? 0.72);
       if ('metalness' in material && options.metalness !== undefined) material.metalness = options.metalness;
+      if (options.opacity !== undefined) {
+        material.transparent = true;
+        material.opacity = options.opacity;
+      }
+      if (options.clippingPlanes) {
+        material.clippingPlanes = options.clippingPlanes;
+        material.clipIntersection = true;
+      }
       material.needsUpdate = true;
     });
   });
@@ -186,6 +195,38 @@ function makeAisle() {
       group.add(pew);
     });
   }
+
+  return group;
+}
+
+function makeCentralHallMask() {
+  const group = new THREE.Group();
+  const sideMaterial = new THREE.MeshBasicMaterial({
+    color: '#120503',
+    transparent: true,
+    opacity: 0.96,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const ceilingMaterial = new THREE.MeshBasicMaterial({
+    color: '#120503',
+    transparent: true,
+    opacity: 0.68,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+
+  [-1.42, 1.42].forEach((x) => {
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(19, 4.4), sideMaterial);
+    wall.position.set(x, 2.2, -0.2);
+    wall.rotation.y = Math.PI / 2;
+    group.add(wall);
+  });
+
+  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(2.85, 19), ceilingMaterial);
+  ceiling.position.set(0, 4.2, -0.2);
+  ceiling.rotation.x = Math.PI / 2;
+  group.add(ceiling);
 
   return group;
 }
@@ -271,9 +312,9 @@ function updateHeroOverlay(progress) {
   }
 }
 
-function updatePageOverlay(progress, camera, bibleMount) {
+function updatePageOverlay(progress, camera, pageAnchorGroup) {
   const overlay = document.getElementById('pageContentOverlay');
-  if (!overlay || !bibleMount) return;
+  if (!overlay || !pageAnchorGroup) return;
 
   const overlayOpacity = smoothstep(0.9, 0.98, progress);
   overlay.style.setProperty('--page-overlay-opacity', String(reducedMotion ? 1 : overlayOpacity));
@@ -287,11 +328,11 @@ function updatePageOverlay(progress, camera, bibleMount) {
   }
 
   const anchors = [
-    new THREE.Vector3(-0.78, 0.09, -0.5),
-    new THREE.Vector3(0.78, 0.09, -0.5),
-    new THREE.Vector3(-0.78, 0.09, 0.5),
-    new THREE.Vector3(0.78, 0.09, 0.5),
-  ].map((point) => bibleMount.localToWorld(point.clone()).project(camera));
+    new THREE.Vector3(-0.54, 0.12, -0.36),
+    new THREE.Vector3(0.54, 0.12, -0.36),
+    new THREE.Vector3(-0.54, 0.12, 0.36),
+    new THREE.Vector3(0.54, 0.12, 0.36),
+  ].map((point) => pageAnchorGroup.localToWorld(point.clone()).project(camera));
 
   const xs = anchors.map((point) => (point.x * 0.5 + 0.5) * window.innerWidth);
   const ys = anchors.map((point) => (-point.y * 0.5 + 0.5) * window.innerHeight);
@@ -303,7 +344,7 @@ function updatePageOverlay(progress, camera, bibleMount) {
   const height = clamp(bottom - top, 220, 380);
 
   overlay.style.left = `${(left + right) / 2}px`;
-  overlay.style.top = `${(top + bottom) / 2}px`;
+  overlay.style.top = `${(top + bottom) / 2 + height * 0.08}px`;
   overlay.style.width = `${width}px`;
   overlay.style.setProperty('--page-tilt', '-3deg');
   overlay.style.maxHeight = `${height}px`;
@@ -325,6 +366,7 @@ async function setupScene() {
   renderer.toneMappingExposure = 1.08;
   renderer.shadowMap.enabled = !lowPowerViewport;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.localClippingEnabled = true;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#180806');
@@ -354,6 +396,8 @@ async function setupScene() {
   const world = new THREE.Group();
   scene.add(world);
   world.add(makeAisle());
+  const hallMask = makeCentralHallMask();
+  world.add(hallMask);
 
   const dust = createDust();
   scene.add(dust);
@@ -378,7 +422,18 @@ async function setupScene() {
   let interior = null;
   if (loaded.interior?.model) {
     interior = normalizeToHeight(loaded.interior.model, SCENE_TUNING.interiorHeight);
-    tuneMaterials(interior, { envMapIntensity: 0.32, roughness: 0.9 });
+    const centerAisleClip = [
+      new THREE.Plane(new THREE.Vector3(1, 0, 0), 1.85),
+      new THREE.Plane(new THREE.Vector3(-1, 0, 0), 1.85),
+      new THREE.Plane(new THREE.Vector3(0, 1, 0), 0.05),
+      new THREE.Plane(new THREE.Vector3(0, 0, -1), 8.2),
+    ];
+    tuneMaterials(interior, {
+      envMapIntensity: 0.28,
+      roughness: 0.92,
+      opacity: 0.07,
+      clippingPlanes: centerAisleClip,
+    });
     interior.position.fromArray(SCENE_TUNING.interiorPosition);
     interior.rotation.copy(toEuler(SCENE_TUNING.interiorRotation));
     world.add(interior);
@@ -407,25 +462,28 @@ async function setupScene() {
 
   const bibleMount = new THREE.Group();
   bibleMount.name = 'bibleMount';
-  bibleMount.position.fromArray(SCENE_TUNING.biblePosition);
-  bibleMount.rotation.copy(toEuler(SCENE_TUNING.bibleRotation));
-  bibleMount.scale.setScalar(SCENE_TUNING.bibleScale);
   lecternRig.add(bibleMount);
 
   const closedBibleGroup = new THREE.Group();
   const openBibleGroup = new THREE.Group();
+  closedBibleGroup.position.fromArray(SCENE_TUNING.closedBiblePosition);
+  closedBibleGroup.rotation.copy(toEuler(SCENE_TUNING.closedBibleRotation));
+  closedBibleGroup.scale.setScalar(SCENE_TUNING.closedBibleScale);
+  openBibleGroup.position.fromArray(SCENE_TUNING.openBiblePosition);
+  openBibleGroup.rotation.copy(toEuler(SCENE_TUNING.openBibleRotation));
+  openBibleGroup.scale.setScalar(SCENE_TUNING.openBibleScale);
   bibleMount.add(closedBibleGroup, openBibleGroup);
 
   if (loaded.closedBible?.model) {
-    const closedBible = normalizeFootprint(loaded.closedBible.model, SCENE_TUNING.closedBibleFootprint);
+    const closedBible = normalizeFootprint(loaded.closedBible.model, 1);
     tuneMaterials(closedBible, { envMapIntensity: 0.96, roughness: 0.76 });
     closedBibleGroup.add(closedBible);
   }
 
   if (loaded.openBible?.model) {
     const openBible = loaded.openBible.model;
-    openBible.rotation.set(-Math.PI / 2, 0, Math.PI);
-    normalizeFootprint(openBible, SCENE_TUNING.openBibleFootprint);
+    openBible.rotation.set(0, Math.PI / 2, 0);
+    normalizeFootprint(openBible, 1);
     tuneMaterials(openBible, { envMapIntensity: 0.92, roughness: 0.78 });
     openBibleGroup.add(openBible);
     setOpacity(openBibleGroup, 0);
@@ -460,19 +518,20 @@ async function setupScene() {
     target.copy(point.target);
     camera.lookAt(target);
 
-    const closeOut = smoothstep(0.855, 0.875, progress);
-    const openIn = smoothstep(0.875, 0.91, progress);
+    const closeOut = smoothstep(0.855, 0.872, progress);
+    const openIn = smoothstep(0.872, 0.892, progress);
     setOpacity(closedBibleGroup, 1 - closeOut);
     setOpacity(openBibleGroup, openIn);
     if (door) setOpacity(door, 1 - smoothstep(0.08, 0.2, progress));
-    if (interior) setOpacity(interior, mix(0.34, 0.04, smoothstep(0.24, 0.52, progress)));
+    if (interior) setOpacity(interior, mix(0.07, 0.012, smoothstep(0.16, 0.5, progress)));
+    hallMask.visible = progress < 0.62;
 
     sanctuaryGlow.intensity = mix(3.2, 5.4, smoothstep(0.78, 0.98, progress));
     doorGlow.intensity = mix(2.5, 0.42, smoothstep(0.08, 0.34, progress));
     dust.position.z = mix(0, -1, progress);
 
     updateHeroOverlay(progress);
-    updatePageOverlay(progress, camera, bibleMount);
+    updatePageOverlay(progress, camera, openBibleGroup);
     updateDebugLabels(debugLabels, camera);
   }
 

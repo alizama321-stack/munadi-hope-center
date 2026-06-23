@@ -77,14 +77,14 @@ Current flow:
 Corrected camera waypoints:
 
 ```text
-door_entry
+entrance_pov
 aisle_start
 aisle_mid
 stage_approach
-lectern_hero
-bible_closeup
-bible_topdown
-open_pages
+lectern_stage
+bible_cover_topdown
+bible_open_on_lectern
+bible_pages_content
 ```
 
 Model-orientation notes:
@@ -100,8 +100,9 @@ Implementation notes:
 - Models are loaded from `public/assets/models/optimized/`.
 - The optimized files use meshopt compression, so the loader uses `MeshoptDecoder`.
 - Camera timeline points are named and commented in `src/main.js` for tuning.
-- `src/main.js` exposes easy scene constants for `biblePosition`, `bibleRotation`, `bibleScale`, `lecternPosition`, `lecternRotation`, and `lecternScale`.
-- The closed and open Bible models share one `bibleMount` group so the reveal happens in the same physical position.
+- `src/main.js` exposes easy scene constants for `lecternPosition`, `lecternRotation`, `lecternScale`, `closedBiblePosition`, `closedBibleRotation`, `closedBibleScale`, `openBiblePosition`, `openBibleRotation`, and `openBibleScale`.
+- The closed and open Bible models share one `bibleMount` group and matching transforms so the reveal happens in the same physical position on the lectern.
+- Public navigation no longer exposes prototype labels; debug labels and helper controls are hidden unless `?debug=1` is active.
 - Add `?debug=1` to the URL to show timeline percentage and scene beat labels.
 - Mobile skips the heavy church interior asset and uses a shorter/lighter environment path.
 - Important text stays in HTML overlays for accessibility and readability.
