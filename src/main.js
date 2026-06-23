@@ -15,21 +15,42 @@ const ASSETS = {
   openBible: `${MODEL_ROOT}open_bible.glb`,
 };
 
-const cameraTimeline = [
-  // Debug: 00 Threshold - camera begins outside the wooden church door.
-  { label: 'Threshold', at: 0, camera: [0, 1.55, 17], target: [0, 1.25, 8] },
-  // Debug: 01 Through the door - pass the entrance without a scene cut.
-  { label: 'Entering', at: 0.16, camera: [0, 1.58, 9.2], target: [0, 1.22, 3.2] },
-  // Debug: 02 Aisle - slow travel through the church interior.
-  { label: 'Aisle', at: 0.35, camera: [0.15, 1.62, 3.4], target: [0, 1.1, -4.6] },
-  // Debug: 03 Lectern reveal - HTML hero copy appears while the lectern anchors right side.
-  { label: 'Lectern', at: 0.55, camera: [-1.85, 1.55, -2.35], target: [1.2, 1.05, -6.25] },
-  // Debug: 04 Hero hold - composition balances text left, lectern and closed Bible right.
-  { label: 'Hero', at: 0.68, camera: [-2.28, 1.72, -4.5], target: [0.92, 1.55, -6.88] },
-  // Debug: 05 Bible push - camera moves closer to the closed Bible.
-  { label: 'Bible close', at: 0.83, camera: [-0.42, 2.38, -5.3], target: [1.03, 2.04, -7.02] },
-  // Debug: 06 Open pages - closed Bible fades into open Bible as the content foundation.
-  { label: 'Open pages', at: 1, camera: [0.62, 3.18, -5.0], target: [0.92, 2.12, -7.08] },
+// Scene transform constants for Phase 2 tuning.
+const SCENE_TUNING = {
+  // The church interior's longest model axis is local X; rotate it so that axis becomes the world Z nave path.
+  interiorPosition: [0, 0, 0.1],
+  interiorRotation: [0, -Math.PI / 2, 0],
+  interiorHeight: 5.2,
+  doorPosition: [0, 0, 8.6],
+  doorRotation: [0, 0, 0],
+  doorHeight: 4.65,
+  lecternPosition: [0.12, 0, -6.35],
+  lecternRotation: [0, 0, 0],
+  lecternScale: 1.36,
+  biblePosition: [0, 1.91, 0.08],
+  bibleRotation: [0, 0, 0],
+  bibleScale: 1,
+  closedBibleFootprint: 0.84,
+  openBibleFootprint: 1.08,
+};
+
+const cameraWaypoints = [
+  // door_entry: camera waits outside the main wooden entrance.
+  { name: 'door_entry', at: 0, camera: [0, 1.58, 11.8], target: [0, 1.48, 8.55] },
+  // aisle_start: camera crosses the threshold and aligns with the center aisle.
+  { name: 'aisle_start', at: 0.14, camera: [0, 1.58, 7.2], target: [0, 1.42, 2.2] },
+  // aisle_mid: camera travels straight down the central nave/hallway.
+  { name: 'aisle_mid', at: 0.32, camera: [0, 1.58, 2.35], target: [0, 1.34, -3.7] },
+  // stage_approach: camera approaches the front/stage without cutting scenes.
+  { name: 'stage_approach', at: 0.5, camera: [0, 1.62, -2.7], target: [0.05, 1.42, -6.35] },
+  // lectern_hero: hero copy appears while lectern and closed Bible sit on the right.
+  { name: 'lectern_hero', at: 0.64, camera: [-2.45, 1.74, -4.42], target: [0.02, 1.72, -6.32] },
+  // bible_closeup: camera pushes toward the closed Bible cover.
+  { name: 'bible_closeup', at: 0.77, camera: [-0.72, 2.48, -5.16], target: [0, 2.08, -6.28] },
+  // bible_topdown: camera reaches a top-down view of the closed cover before reveal.
+  { name: 'bible_topdown', at: 0.87, camera: [0, 4.28, -6.35], target: [0, 2.04, -6.35] },
+  // open_pages: same physical mount, open Bible visible, HTML page overlay aligns to the spread.
+  { name: 'open_pages', at: 1, camera: [0, 4.32, -6.42], target: [0, 2.02, -6.35] },
 ];
 
 function clamp(value, min = 0, max = 1) {
@@ -49,22 +70,26 @@ function mixVec3(a, b, t) {
   return new THREE.Vector3(mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t));
 }
 
-function getTimelinePoint(progress) {
-  const p = reducedMotion ? 0.72 : clamp(progress);
-  let start = cameraTimeline[0];
-  let end = cameraTimeline[cameraTimeline.length - 1];
+function toEuler(values) {
+  return new THREE.Euler(values[0], values[1], values[2]);
+}
 
-  for (let i = 0; i < cameraTimeline.length - 1; i += 1) {
-    if (p >= cameraTimeline[i].at && p <= cameraTimeline[i + 1].at) {
-      start = cameraTimeline[i];
-      end = cameraTimeline[i + 1];
+function getTimelinePoint(progress) {
+  const p = reducedMotion ? 0.82 : clamp(progress);
+  let start = cameraWaypoints[0];
+  let end = cameraWaypoints[cameraWaypoints.length - 1];
+
+  for (let i = 0; i < cameraWaypoints.length - 1; i += 1) {
+    if (p >= cameraWaypoints[i].at && p <= cameraWaypoints[i + 1].at) {
+      start = cameraWaypoints[i];
+      end = cameraWaypoints[i + 1];
       break;
     }
   }
 
   const local = smoothstep(start.at, end.at, p);
   return {
-    label: local < 0.5 ? start.label : end.label,
+    name: local < 0.5 ? start.name : end.name,
     camera: mixVec3(start.camera, end.camera, local),
     target: mixVec3(start.target, end.target, local),
   };
@@ -77,15 +102,15 @@ function setStatus(message, state = '') {
   status.dataset.state = state;
 }
 
-function modelOpacity(object, opacity) {
+function setOpacity(object, opacity) {
   object.visible = opacity > 0.01;
   object.traverse((child) => {
     if (!child.isMesh || !child.material) return;
     const materials = Array.isArray(child.material) ? child.material : [child.material];
     materials.forEach((material) => {
-      material.transparent = true;
+      material.transparent = opacity < 0.999;
       material.opacity = opacity;
-      material.depthWrite = opacity > 0.85;
+      material.depthWrite = opacity > 0.98;
     });
   });
 }
@@ -99,64 +124,63 @@ function tuneMaterials(object, options = {}) {
     materials.forEach((material) => {
       if (!material) return;
       material.envMapIntensity = options.envMapIntensity ?? 0.7;
-      material.needsUpdate = true;
-      if ('roughness' in material) material.roughness = Math.max(material.roughness ?? 0.6, options.roughness ?? 0.72);
+      if ('roughness' in material) material.roughness = Math.max(material.roughness ?? 0.65, options.roughness ?? 0.72);
       if ('metalness' in material && options.metalness !== undefined) material.metalness = options.metalness;
+      material.needsUpdate = true;
     });
   });
 }
 
-function normalizeModel(object, targetSize, axis = 'y') {
+function normalizeToGround(object) {
   const box = new THREE.Box3().setFromObject(object);
-  const size = box.getSize(new THREE.Vector3());
-  const scale = targetSize / Math.max(0.001, size[axis]);
-  object.scale.setScalar(scale);
-
-  const scaledBox = new THREE.Box3().setFromObject(object);
-  const center = scaledBox.getCenter(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
   object.position.x -= center.x;
   object.position.z -= center.z;
-  object.position.y -= scaledBox.min.y;
+  object.position.y -= box.min.y;
   return object;
+}
+
+function normalizeToHeight(object, targetHeight) {
+  const box = new THREE.Box3().setFromObject(object);
+  const size = box.getSize(new THREE.Vector3());
+  object.scale.setScalar(targetHeight / Math.max(0.001, size.y));
+  return normalizeToGround(object);
+}
+
+function normalizeFootprint(object, targetWidth) {
+  const box = new THREE.Box3().setFromObject(object);
+  const size = box.getSize(new THREE.Vector3());
+  object.scale.setScalar(targetWidth / Math.max(0.001, size.x));
+  return normalizeToGround(object);
 }
 
 function makeAisle() {
   const group = new THREE.Group();
   const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(10, 30, 1, 1),
-    new THREE.MeshStandardMaterial({
-      color: '#2b1208',
-      roughness: 0.96,
-      metalness: 0,
-    }),
+    new THREE.PlaneGeometry(8.4, 21, 1, 1),
+    new THREE.MeshStandardMaterial({ color: '#241008', roughness: 0.96 }),
   );
   floor.rotation.x = -Math.PI / 2;
-  floor.position.z = 0;
+  floor.position.z = 0.8;
   floor.receiveShadow = true;
   group.add(floor);
 
   const runner = new THREE.Mesh(
-    new THREE.PlaneGeometry(2.3, 30, 1, 1),
-    new THREE.MeshStandardMaterial({
-      color: '#4d1910',
-      roughness: 0.92,
-      transparent: true,
-      opacity: 0.62,
-    }),
+    new THREE.PlaneGeometry(1.45, 20.5, 1, 1),
+    new THREE.MeshStandardMaterial({ color: '#521b10', roughness: 0.92, transparent: true, opacity: 0.78 }),
   );
   runner.rotation.x = -Math.PI / 2;
-  runner.position.y = 0.012;
-  runner.position.z = -0.2;
+  runner.position.set(0, 0.012, 0.55);
   group.add(runner);
 
-  for (let i = 0; i < 7; i += 1) {
-    const z = 8 - i * 3.2;
-    [-3.2, 3.2].forEach((x) => {
+  for (let i = 0; i < 6; i += 1) {
+    const z = 5.4 - i * 2.75;
+    [-2.85, 2.85].forEach((x) => {
       const pew = new THREE.Mesh(
-        new THREE.BoxGeometry(2.1, 0.22, 0.52),
-        new THREE.MeshStandardMaterial({ color: '#3a170b', roughness: 0.88 }),
+        new THREE.BoxGeometry(1.9, 0.2, 0.46),
+        new THREE.MeshStandardMaterial({ color: '#321207', roughness: 0.9 }),
       );
-      pew.position.set(x, 0.45, z);
+      pew.position.set(x, 0.42, z);
       pew.castShadow = true;
       pew.receiveShadow = true;
       group.add(pew);
@@ -167,14 +191,14 @@ function makeAisle() {
 }
 
 function createDust() {
-  const count = lowPowerViewport ? 100 : 220;
+  const count = lowPowerViewport ? 90 : 180;
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
 
   for (let i = 0; i < count; i += 1) {
-    positions[i * 3] = (Math.random() - 0.5) * 8;
-    positions[i * 3 + 1] = 0.8 + Math.random() * 3;
-    positions[i * 3 + 2] = -8 + Math.random() * 24;
+    positions[i * 3] = (Math.random() - 0.5) * 7.4;
+    positions[i * 3 + 1] = 0.8 + Math.random() * 3.4;
+    positions[i * 3 + 2] = -7.5 + Math.random() * 18;
     colors[i * 3] = 1;
     colors[i * 3 + 1] = 0.78 + Math.random() * 0.16;
     colors[i * 3 + 2] = 0.38 + Math.random() * 0.2;
@@ -188,7 +212,7 @@ function createDust() {
     new THREE.PointsMaterial({
       size: lowPowerViewport ? 0.022 : 0.016,
       transparent: true,
-      opacity: 0.42,
+      opacity: 0.36,
       vertexColors: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
@@ -196,42 +220,93 @@ function createDust() {
   );
 }
 
+function createDebugLabels(container) {
+  return cameraWaypoints.map((waypoint) => {
+    const label = document.createElement('div');
+    label.className = 'debug-label';
+    label.textContent = waypoint.name;
+    container.appendChild(label);
+    return { label, waypoint };
+  });
+}
+
+function updateDebugLabels(labels, camera) {
+  if (!labels.length) return;
+  labels.forEach(({ label, waypoint }) => {
+    const projected = new THREE.Vector3().fromArray(waypoint.target).project(camera);
+    const visible = projected.z > -1 && projected.z < 1;
+    label.style.opacity = visible ? '1' : '0';
+    label.style.left = `${(projected.x * 0.5 + 0.5) * window.innerWidth}px`;
+    label.style.top = `${(-projected.y * 0.5 + 0.5) * window.innerHeight}px`;
+  });
+}
+
 async function loadModel(loader, key, path, required = true) {
   try {
     const gltf = await loader.loadAsync(path);
     return { key, model: gltf.scene, error: null };
   } catch (error) {
-    if (required) {
-      setStatus(`Scene asset failed to load: ${key}. Check ${path}`, 'error');
-    }
+    if (required) setStatus(`Scene asset failed to load: ${key}. Check ${path}`, 'error');
     return { key, model: null, error };
   }
 }
 
 function updateHeroOverlay(progress) {
   const heroCopy = document.getElementById('heroCopy');
-  const openPages = document.querySelector('.page-panel');
   const label = document.getElementById('timelineLabel');
 
-  const heroIn = smoothstep(0.42, 0.56, progress);
-  const heroOut = smoothstep(0.74, 0.9, progress);
+  const heroIn = smoothstep(0.52, 0.63, progress);
+  const heroOut = smoothstep(0.76, 0.86, progress);
   const heroOpacity = reducedMotion ? 1 : heroIn * (1 - heroOut);
 
   if (heroCopy) {
     heroCopy.style.opacity = String(heroOpacity);
-    heroCopy.style.transform = `translate3d(0, ${mix(28, -48, heroOut)}px, 0)`;
+    heroCopy.style.transform = `translate3d(0, ${mix(28, -42, heroOut)}px, 0)`;
     heroCopy.style.pointerEvents = heroOpacity > 0.5 ? 'auto' : 'none';
-  }
-
-  if (openPages) {
-    const pagesIn = smoothstep(0.86, 1, progress);
-    openPages.style.setProperty('--page-progress', String(reducedMotion ? 1 : pagesIn));
   }
 
   if (label) {
     const point = getTimelinePoint(progress);
-    label.textContent = debugMode ? `${Math.round(progress * 100)}% - ${point.label}` : point.label;
+    label.textContent = debugMode ? `${Math.round(progress * 100)}% - ${point.name}` : point.name.replaceAll('_', ' ');
   }
+}
+
+function updatePageOverlay(progress, camera, bibleMount) {
+  const overlay = document.getElementById('pageContentOverlay');
+  if (!overlay || !bibleMount) return;
+
+  const overlayOpacity = smoothstep(0.9, 0.98, progress);
+  overlay.style.setProperty('--page-overlay-opacity', String(reducedMotion ? 1 : overlayOpacity));
+
+  if (lowPowerViewport) {
+    overlay.style.left = '50%';
+    overlay.style.top = '55%';
+    overlay.style.width = 'min(360px, calc(100vw - 1.5rem))';
+    overlay.style.setProperty('--page-tilt', '0deg');
+    return;
+  }
+
+  const anchors = [
+    new THREE.Vector3(-0.78, 0.09, -0.5),
+    new THREE.Vector3(0.78, 0.09, -0.5),
+    new THREE.Vector3(-0.78, 0.09, 0.5),
+    new THREE.Vector3(0.78, 0.09, 0.5),
+  ].map((point) => bibleMount.localToWorld(point.clone()).project(camera));
+
+  const xs = anchors.map((point) => (point.x * 0.5 + 0.5) * window.innerWidth);
+  const ys = anchors.map((point) => (-point.y * 0.5 + 0.5) * window.innerHeight);
+  const left = Math.min(...xs);
+  const right = Math.max(...xs);
+  const top = Math.min(...ys);
+  const bottom = Math.max(...ys);
+  const width = clamp(right - left, 520, 820);
+  const height = clamp(bottom - top, 220, 380);
+
+  overlay.style.left = `${(left + right) / 2}px`;
+  overlay.style.top = `${(top + bottom) / 2}px`;
+  overlay.style.width = `${width}px`;
+  overlay.style.setProperty('--page-tilt', '-3deg');
+  overlay.style.maxHeight = `${height}px`;
 }
 
 async function setupScene() {
@@ -247,35 +322,33 @@ async function setupScene() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lowPowerViewport ? 1.25 : 1.75));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.08;
   renderer.shadowMap.enabled = !lowPowerViewport;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#180806');
-  scene.fog = new THREE.FogExp2('#190806', lowPowerViewport ? 0.075 : 0.052);
+  scene.fog = new THREE.FogExp2('#190806', lowPowerViewport ? 0.074 : 0.048);
 
   const camera = new THREE.PerspectiveCamera(lowPowerViewport ? 44 : 38, 1, 0.1, 80);
   const target = new THREE.Vector3();
-
   const loader = new GLTFLoader();
   loader.setMeshoptDecoder(MeshoptDecoder);
 
-  scene.add(new THREE.HemisphereLight('#fff0c8', '#120503', 1.15));
-  const key = new THREE.DirectionalLight('#ffd38d', 2.6);
+  scene.add(new THREE.HemisphereLight('#fff0c8', '#120503', 1.08));
+  const key = new THREE.DirectionalLight('#ffd38d', 2.4);
   key.position.set(-4, 7, 9);
   key.castShadow = !lowPowerViewport;
-  key.shadow.mapSize.set(1024, 1024);
   scene.add(key);
 
-  const sanctuaryGlow = new THREE.SpotLight('#f0ad5a', 4.2, 28, 0.36, 0.75, 1.2);
-  sanctuaryGlow.position.set(1.6, 5.4, -3.2);
-  sanctuaryGlow.target.position.set(0, 0.7, -7);
+  const sanctuaryGlow = new THREE.SpotLight('#f0ad5a', 4.1, 28, 0.34, 0.76, 1.2);
+  sanctuaryGlow.position.set(1.4, 5.3, -3.4);
+  sanctuaryGlow.target.position.set(0, 1.1, -6.35);
   sanctuaryGlow.castShadow = !lowPowerViewport;
   scene.add(sanctuaryGlow, sanctuaryGlow.target);
 
-  const doorGlow = new THREE.PointLight('#ffc271', 2.4, 12, 1.6);
-  doorGlow.position.set(0, 2.2, 9.5);
+  const doorGlow = new THREE.PointLight('#ffc271', 2.5, 12, 1.6);
+  doorGlow.position.set(0, 2.2, 8.3);
   scene.add(doorGlow);
 
   const world = new THREE.Group();
@@ -285,15 +358,14 @@ async function setupScene() {
   const dust = createDust();
   scene.add(dust);
 
-  const loadList = [
+  const results = await Promise.all([
     loadModel(loader, 'door', ASSETS.door),
     lowPowerViewport ? Promise.resolve({ key: 'interior', model: null, skipped: true }) : loadModel(loader, 'interior', ASSETS.interior, false),
     loadModel(loader, 'lectern', ASSETS.lectern),
     loadModel(loader, 'closedBible', ASSETS.closedBible),
     loadModel(loader, 'openBible', ASSETS.openBible),
-  ];
+  ]);
 
-  const results = await Promise.all(loadList);
   const loaded = Object.fromEntries(results.map((result) => [result.key, result]));
   const failures = results.filter((result) => result.error);
   if (failures.length) {
@@ -303,59 +375,64 @@ async function setupScene() {
     setStatus(lowPowerViewport ? 'Mobile scene loaded with lighter environment.' : 'Church scene loaded.', 'ready');
   }
 
+  let interior = null;
   if (loaded.interior?.model) {
-    const interior = normalizeModel(loaded.interior.model, 5.2, 'y');
-    tuneMaterials(interior, { envMapIntensity: 0.35, roughness: 0.88 });
-    interior.position.set(0, 0, 0.5);
-    interior.rotation.y = Math.PI;
+    interior = normalizeToHeight(loaded.interior.model, SCENE_TUNING.interiorHeight);
+    tuneMaterials(interior, { envMapIntensity: 0.32, roughness: 0.9 });
+    interior.position.fromArray(SCENE_TUNING.interiorPosition);
+    interior.rotation.copy(toEuler(SCENE_TUNING.interiorRotation));
     world.add(interior);
   }
 
+  let door = null;
   if (loaded.door?.model) {
-    const door = normalizeModel(loaded.door.model, 4.6, 'y');
-    tuneMaterials(door, { envMapIntensity: 0.4, roughness: 0.82 });
-    door.position.set(0, 0, 8.75);
-    door.rotation.y = Math.PI;
+    door = normalizeToHeight(loaded.door.model, SCENE_TUNING.doorHeight);
+    tuneMaterials(door, { envMapIntensity: 0.42, roughness: 0.84 });
+    door.position.fromArray(SCENE_TUNING.doorPosition);
+    door.rotation.copy(toEuler(SCENE_TUNING.doorRotation));
     world.add(door);
   }
 
-  const altar = new THREE.Group();
-  altar.position.set(1.05, 0, -7.2);
-  altar.rotation.y = -0.22;
-  world.add(altar);
+  const lecternRig = new THREE.Group();
+  lecternRig.position.fromArray(SCENE_TUNING.lecternPosition);
+  lecternRig.rotation.copy(toEuler(SCENE_TUNING.lecternRotation));
+  world.add(lecternRig);
 
   if (loaded.lectern?.model) {
-    const lectern = normalizeModel(loaded.lectern.model, 2.05, 'y');
-    tuneMaterials(lectern, { envMapIntensity: 0.65, roughness: 0.72 });
-    altar.add(lectern);
+    const lectern = normalizeToGround(loaded.lectern.model);
+    lectern.scale.setScalar(SCENE_TUNING.lecternScale);
+    tuneMaterials(lectern, { envMapIntensity: 0.68, roughness: 0.72 });
+    lecternRig.add(lectern);
   }
+
+  const bibleMount = new THREE.Group();
+  bibleMount.name = 'bibleMount';
+  bibleMount.position.fromArray(SCENE_TUNING.biblePosition);
+  bibleMount.rotation.copy(toEuler(SCENE_TUNING.bibleRotation));
+  bibleMount.scale.setScalar(SCENE_TUNING.bibleScale);
+  lecternRig.add(bibleMount);
 
   const closedBibleGroup = new THREE.Group();
-  closedBibleGroup.position.set(0.02, 1.97, 0.18);
-  closedBibleGroup.rotation.set(-0.18, -0.08, 0);
-  altar.add(closedBibleGroup);
+  const openBibleGroup = new THREE.Group();
+  bibleMount.add(closedBibleGroup, openBibleGroup);
 
   if (loaded.closedBible?.model) {
-    const closedBible = normalizeModel(loaded.closedBible.model, 0.42, 'z');
-    tuneMaterials(closedBible, { envMapIntensity: 0.95, roughness: 0.74 });
-    closedBible.rotation.set(0, Math.PI * 0.5, 0);
+    const closedBible = normalizeFootprint(loaded.closedBible.model, SCENE_TUNING.closedBibleFootprint);
+    tuneMaterials(closedBible, { envMapIntensity: 0.96, roughness: 0.76 });
     closedBibleGroup.add(closedBible);
   }
-
-  const openBibleGroup = new THREE.Group();
-  openBibleGroup.position.set(0.02, 2.18, 0.16);
-  openBibleGroup.rotation.set(-0.12, -0.04, 0);
-  altar.add(openBibleGroup);
 
   if (loaded.openBible?.model) {
     const openBible = loaded.openBible.model;
     openBible.rotation.set(-Math.PI / 2, 0, Math.PI);
-    normalizeModel(openBible, 1.25, 'x');
-    tuneMaterials(openBible, { envMapIntensity: 0.9, roughness: 0.78 });
+    normalizeFootprint(openBible, SCENE_TUNING.openBibleFootprint);
+    tuneMaterials(openBible, { envMapIntensity: 0.92, roughness: 0.78 });
     openBibleGroup.add(openBible);
-    modelOpacity(openBibleGroup, 0);
+    setOpacity(openBibleGroup, 0);
   }
 
+  const debugContainer = document.body;
+  const debugLabels = createDebugLabels(debugContainer);
   function resize() {
     const width = Math.max(1, window.innerWidth);
     const height = Math.max(1, window.innerHeight);
@@ -365,12 +442,9 @@ async function setupScene() {
   }
 
   function scrollProgress() {
-    if (reducedMotion) return 0.9;
+    if (reducedMotion) return 0.96;
     const journey = document.getElementById('journey');
-    if (!journey) {
-      const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-      return clamp(window.scrollY / max);
-    }
+    if (!journey) return 0;
     const rect = journey.getBoundingClientRect();
     const max = Math.max(1, journey.offsetHeight - window.innerHeight);
     return clamp(-rect.top / max);
@@ -386,17 +460,20 @@ async function setupScene() {
     target.copy(point.target);
     camera.lookAt(target);
 
-    const reveal = smoothstep(0.76, 0.92, progress);
-    modelOpacity(closedBibleGroup, 1 - reveal);
-    modelOpacity(openBibleGroup, reveal);
-    openBibleGroup.scale.setScalar(mix(0.62, lowPowerViewport ? 0.82 : 0.86, reveal));
-    openBibleGroup.position.y = mix(2.18, 2.2, reveal);
-    altar.rotation.y = mix(-0.22, -0.04, reveal);
+    const closeOut = smoothstep(0.855, 0.875, progress);
+    const openIn = smoothstep(0.875, 0.91, progress);
+    setOpacity(closedBibleGroup, 1 - closeOut);
+    setOpacity(openBibleGroup, openIn);
+    if (door) setOpacity(door, 1 - smoothstep(0.08, 0.2, progress));
+    if (interior) setOpacity(interior, mix(0.34, 0.04, smoothstep(0.24, 0.52, progress)));
 
-    sanctuaryGlow.intensity = mix(3.2, 5.6, reveal);
-    doorGlow.intensity = mix(2.4, 0.45, smoothstep(0.12, 0.42, progress));
-    dust.position.z = mix(0, -1.2, progress);
+    sanctuaryGlow.intensity = mix(3.2, 5.4, smoothstep(0.78, 0.98, progress));
+    doorGlow.intensity = mix(2.5, 0.42, smoothstep(0.08, 0.34, progress));
+    dust.position.z = mix(0, -1, progress);
+
     updateHeroOverlay(progress);
+    updatePageOverlay(progress, camera, bibleMount);
+    updateDebugLabels(debugLabels, camera);
   }
 
   function render(now) {
@@ -404,7 +481,7 @@ async function setupScene() {
     last = now;
     desiredProgress = scrollProgress();
     renderedProgress = THREE.MathUtils.damp(renderedProgress, desiredProgress, reducedMotion ? 18 : 12, delta);
-    dust.rotation.y += delta * 0.018;
+    dust.rotation.y += delta * 0.016;
     updateScene(renderedProgress);
     renderer.render(scene, camera);
     requestAnimationFrame(render);
@@ -418,25 +495,6 @@ async function setupScene() {
 
   updateScene(desiredProgress);
   requestAnimationFrame(render);
-}
-
-function setupRevealObserver() {
-  const revealEls = document.querySelectorAll('.reveal');
-  if (!('IntersectionObserver' in window)) {
-    revealEls.forEach((el) => el.classList.add('in-view'));
-    return;
-  }
-
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach((entry) => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('in-view');
-        observer.unobserve(entry.target);
-      }
-    });
-  }, { threshold: 0.16 });
-
-  revealEls.forEach((el) => observer.observe(el));
 }
 
 function setupNavSpy() {
@@ -465,6 +523,18 @@ function setupAnchorNavigation() {
       if (!target) return;
       event.preventDefault();
       history.pushState(null, '', hash);
+
+      if (link.dataset.scrollEnd === 'true') {
+        const journey = document.getElementById('journey');
+        const max = journey.offsetHeight - window.innerHeight;
+        window.scrollTo({ top: max, behavior: reducedMotion ? 'auto' : 'smooth' });
+        return;
+      }
+
+      if (link.dataset.scrollDebug === 'true') {
+        document.documentElement.classList.add('debug-scene');
+      }
+
       target.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
     });
   });
@@ -474,6 +544,5 @@ document.documentElement.classList.toggle('debug-scene', debugMode);
 document.documentElement.style.scrollBehavior = reducedMotion ? 'auto' : 'smooth';
 
 setupScene();
-setupRevealObserver();
 setupNavSpy();
 setupAnchorNavigation();

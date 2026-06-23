@@ -43,9 +43,9 @@
       </a>
       <nav class="links" aria-label="Primary">
         <a href="#journey" data-nav="journey">Journey</a>
-        <a href="#open-pages" data-nav="open-pages">Open Pages</a>
-        <a href="#phase-notes" data-nav="phase-notes">Phase 2 Notes</a>
-        <a href="#open-pages" data-nav="open-pages" class="cta-link">Enter the Story</a>
+        <a href="#journey" data-nav="journey">Open Pages</a>
+        <a href="#journey" data-nav="journey">Debug Path</a>
+        <a href="#journey" data-nav="journey" class="cta-link">Enter the Story</a>
       </nav>
     </header>
 
@@ -61,49 +61,26 @@
                 through the aisle, toward the lectern, and into the Bible as invitation.
               </p>
               <div class="hero-actions">
-                <a href="#open-pages" class="btn btn-primary">Continue Into the Pages</a>
-                <a href="#phase-notes" class="btn btn-quiet">View Phase 2 Notes</a>
+                <a href="#journey" class="btn btn-primary" data-scroll-end="true">Continue Into the Pages</a>
+                <a href="#journey" class="btn btn-quiet" data-scroll-debug="true">View Debug Path</a>
               </div>
             </div>
           </div>
 
+          <div class="page-content-overlay" id="pageContentOverlay" aria-live="polite">
+            <article class="bible-page-test bible-page-left">
+              <p class="eyebrow">Page test</p>
+              <h2>Hope begins here.</h2>
+              <p>This temporary HTML layer is positioned over the left Bible page. It will later hold the first story chapter.</p>
+            </article>
+            <article class="bible-page-test bible-page-right">
+              <p class="eyebrow">Invitation</p>
+              <h2>Come and see.</h2>
+              <p>This right page proves readable content can belong to the open book while remaining accessible HTML.</p>
+            </article>
+          </div>
+
           <div class="timeline-label" id="timelineLabel" aria-hidden="true">Threshold</div>
-        </div>
-      </section>
-
-      <section id="open-pages" class="chapter open-pages">
-        <div class="chapter-inner page-preview">
-          <div class="page-panel reveal">
-            <p class="eyebrow">We're listening</p>
-            <h2 class="section-title">The open Bible becomes the content foundation.</h2>
-            <p class="lede">
-              Phase 2 stops here: this is the readable HTML layer that will later become Pastor, Prayer Request,
-              Visit, and final invitation chapters aligned over the open page spread.
-            </p>
-            <div class="chapter-markers" aria-label="Future chapter placeholders">
-              <span>Pastor</span>
-              <span>Prayer Request</span>
-              <span>Visit</span>
-              <span>Final CTA</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="phase-notes" class="chapter phase-notes">
-        <div class="chapter-inner">
-          <div class="phase-card reveal">
-            <p class="eyebrow">Phase 2 blocking</p>
-            <h2 class="section-title">What is working in this pass</h2>
-            <div class="phase-grid">
-              <p>One persistent Three.js canvas spans the full experience.</p>
-              <p>The camera moves through labeled timeline beats for tuning.</p>
-              <p>Optimized GLB assets are used for the door, church, lectern, closed Bible, and open Bible.</p>
-              <p>Hero text remains HTML and is synced to the camera approach.</p>
-              <p>The closed Bible transitions into the open Bible as the foundation for the next section.</p>
-              <p>Mobile and reduced-motion users receive a shorter, safer scene path.</p>
-            </div>
-          </div>
         </div>
       </section>
     </main>

@@ -65,12 +65,34 @@ The optimized GLBs use meshopt compression and WebP textures. The future Three.j
 Current flow:
 
 1. Camera starts at the wooden church door.
-2. Camera moves through the entrance into the church aisle.
-3. Camera approaches the lectern.
-4. Hero text appears as HTML on the left while the lectern and closed Bible sit in the 3D scene.
-5. Camera pushes closer to the Bible.
-6. Closed Bible fades into the open Bible.
-7. The open Bible becomes the visual foundation for the next readable content layer.
+2. Camera passes the threshold and follows the center nave direction.
+3. Camera moves down the central aisle/hallway toward the stage.
+4. Camera approaches the lectern.
+5. Hero text appears as HTML on the left while the lectern and closed Bible sit in the 3D scene.
+6. Camera pushes closer to the closed Bible.
+7. Camera reaches a top-down Bible cover view.
+8. Closed Bible transitions to the open Bible from the same mount position.
+9. Readable HTML test content appears over the left and right Bible page areas.
+
+Corrected camera waypoints:
+
+```text
+door_entry
+aisle_start
+aisle_mid
+stage_approach
+lectern_hero
+bible_closeup
+bible_topdown
+open_pages
+```
+
+Model-orientation notes:
+
+- The church interior GLB's longest nave direction is its local X axis.
+- Phase 2 rotates that local X axis onto the world Z travel path so the camera moves through the center instead of drifting through random side fragments.
+- The interior scan is treated as atmospheric architecture and faded before the lectern beat because the source model contains broken scan edges.
+- The wooden door model is a closed entrance, so it fades after the threshold beat to simulate passing through the doorway.
 
 Implementation notes:
 
@@ -78,6 +100,8 @@ Implementation notes:
 - Models are loaded from `public/assets/models/optimized/`.
 - The optimized files use meshopt compression, so the loader uses `MeshoptDecoder`.
 - Camera timeline points are named and commented in `src/main.js` for tuning.
+- `src/main.js` exposes easy scene constants for `biblePosition`, `bibleRotation`, `bibleScale`, `lecternPosition`, `lecternRotation`, and `lecternScale`.
+- The closed and open Bible models share one `bibleMount` group so the reveal happens in the same physical position.
 - Add `?debug=1` to the URL to show timeline percentage and scene beat labels.
 - Mobile skips the heavy church interior asset and uses a shorter/lighter environment path.
 - Important text stays in HTML overlays for accessibility and readability.
@@ -85,7 +109,7 @@ Implementation notes:
 Known Phase 2 limitations:
 
 - This is scene blocking only, not final cinematic polish.
-- The open Bible placement is intentionally rough and should be art-directed in Phase 3.
+- The open Bible/page overlay placement is still a test layer and should be art-directed in the next approved phase.
 - The unlit door/interior materials still need lighting/material treatment.
 - Pastor, Prayer Request, Visit, and final CTA sections are placeholders only.
 
