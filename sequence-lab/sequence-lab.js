@@ -6,10 +6,11 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 const ASSETS = {
   book: '/public/assets/models/book_animated_book__historical_book.glb',
   lectern: '/public/assets/models/optimized/lectern.glb',
+  church: '/public/assets/models/optimized/st_bartholomew-the-less_interior.glb',
 };
 
 const BOOK_LAB_STORAGE_KEY = 'munadiHopeCenter.bookLab.transforms';
-const BOOK_LAB_SEQUENCE_STORAGE_KEY = 'munadiHopeCenter.bookLab.sequence';
+const BOOK_LAB_SEQUENCE_STORAGE_KEY = 'munadiHopeCenter.sequenceLab.sequence';
 
 const LOCKED_LECTERN_TRANSFORM = {
   position: [0, 0, 0],
@@ -36,23 +37,82 @@ const BOOK_LAB_FINAL_TRANSFORMS = {
 
 const OPEN_CLIP_TIME_RATIO = 0.5;
 
+const PRESET_LABELS = {
+  entrance: 'Entrance View',
+  aisle: 'Aisle Walk',
+  stage: 'Stage Approach',
+  altar: 'Altar / Lectern End Point',
+  bible: 'Bible Closeup Preview',
+};
+
+const HUMAN_AXIS_LABELS = {
+  position: {
+    x: 'Move Left / Right',
+    y: 'Move Up / Down',
+    z: 'Move Forward / Back',
+  },
+  target: {
+    x: 'Look At Left / Right',
+    y: 'Look Higher / Lower',
+    z: 'Look Closer / Further',
+  },
+  rotation: {
+    x: 'Tilt Up / Down',
+    y: 'Turn Left / Right',
+    z: 'Lean Sideways',
+  },
+};
+
 const BOOK_LAB_DEFAULT_SEQUENCE = {
   progress: 0,
   camera: {
-    hero: {
-      position: [2.15, 4.05, 3.25],
-      target: [-0.33, 2.05, -0.12],
+    presets: {
+      entrance: {
+        position: [0, 2.1, 9.2],
+        target: [0, 2.0, 4.2],
+        fov: 48,
+        distance: 1,
+      },
+      aisle: {
+        position: [0, 2.0, 4.9],
+        target: [0, 2.05, 0.7],
+        fov: 42,
+        distance: 1,
+      },
+      stage: {
+        position: [0, 2.18, 1.25],
+        target: [0, 2.12, -2.1],
+        fov: 34,
+        distance: 1,
+      },
+      altar: {
+        position: [0, 2.3, -1.45],
+        target: [0, 2.08, -3.45],
+        fov: 28,
+        distance: 1,
+      },
+      bible: {
+        position: [-0.1, 3.08, -3.04],
+        target: [0, 2.26, -3.55],
+        fov: 22,
+        distance: 1,
+      },
     },
-    cover: {
-      position: [-0.33, 3.18, 0.34],
-      target: [-0.33, 2.03, -0.12],
-    },
-    pages: {
-      position: [-0.33, 3.08, 0.02],
-      target: [-0.33, 2.02, -0.12],
-    },
-    fov: 20,
-    distance: 1,
+  },
+  altar: {
+    position: [0, 0, -3.55],
+    rotation: [0, 180, 0],
+    scale: 1,
+  },
+  church: {
+    position: [0, -0.2, 0],
+    rotation: [0, 0, 0],
+    scale: 0.82,
+    visible: true,
+  },
+  environment: {
+    fog: 0.055,
+    darkness: 0.78,
   },
   overlays: {
     opacity: 0.86,
@@ -121,7 +181,7 @@ function loadStoredTransforms() {
     const saved = window.localStorage.getItem(BOOK_LAB_STORAGE_KEY);
     return normalizeTransforms(saved ? JSON.parse(saved) : DEFAULTS);
   } catch (error) {
-    console.warn('[BookLab] Could not load saved calibration; using final approved values.', error);
+    console.warn('[SequenceLab] Could not load saved calibration; using final approved values.', error);
     return cloneConfig(DEFAULTS);
   }
 }
@@ -130,7 +190,7 @@ function persistTransforms() {
   try {
     window.localStorage.setItem(BOOK_LAB_STORAGE_KEY, JSON.stringify(getCurrentTransforms()));
   } catch (error) {
-    console.warn('[BookLab] Could not save calibration.', error);
+    console.warn('[SequenceLab] Could not save calibration.', error);
   }
 }
 
@@ -146,27 +206,46 @@ function normalizeSequenceConfig(value = {}) {
   const source = value || {};
   const defaults = cloneConfig(BOOK_LAB_DEFAULT_SEQUENCE);
   const camera = source.camera || {};
+  const presetSource = camera.presets || {};
   const overlays = source.overlays || {};
   const left = overlays.left || {};
   const right = overlays.right || {};
+  const normalizePreset = (key, legacyKey = key) => {
+    const preset = presetSource[key] || camera[legacyKey] || {};
+    const fallback = defaults.camera.presets[key];
+    return {
+      position: [...(preset.position || fallback.position)],
+      target: [...(preset.target || fallback.target)],
+      fov: Number(preset.fov ?? camera.fov ?? fallback.fov),
+      distance: Number(preset.distance ?? camera.distance ?? fallback.distance),
+    };
+  };
 
   return {
     progress: Number(source.progress ?? defaults.progress),
     camera: {
-      hero: {
-        position: [...(camera.hero?.position || defaults.camera.hero.position)],
-        target: [...(camera.hero?.target || defaults.camera.hero.target)],
+      presets: {
+        entrance: normalizePreset('entrance', 'hero'),
+        aisle: normalizePreset('aisle', 'hero'),
+        stage: normalizePreset('stage', 'cover'),
+        altar: normalizePreset('altar', 'cover'),
+        bible: normalizePreset('bible', 'pages'),
       },
-      cover: {
-        position: [...(camera.cover?.position || defaults.camera.cover.position)],
-        target: [...(camera.cover?.target || defaults.camera.cover.target)],
-      },
-      pages: {
-        position: [...(camera.pages?.position || defaults.camera.pages.position)],
-        target: [...(camera.pages?.target || defaults.camera.pages.target)],
-      },
-      fov: Number(camera.fov ?? defaults.camera.fov),
-      distance: Number(camera.distance ?? defaults.camera.distance),
+    },
+    altar: {
+      position: [...(source.altar?.position || defaults.altar.position)],
+      rotation: [...(source.altar?.rotation || defaults.altar.rotation)],
+      scale: Number(source.altar?.scale ?? defaults.altar.scale),
+    },
+    church: {
+      position: [...(source.church?.position || defaults.church.position)],
+      rotation: [...(source.church?.rotation || defaults.church.rotation)],
+      scale: Number(source.church?.scale ?? defaults.church.scale),
+      visible: Boolean(source.church?.visible ?? defaults.church.visible),
+    },
+    environment: {
+      fog: Number(source.environment?.fog ?? defaults.environment.fog),
+      darkness: Number(source.environment?.darkness ?? defaults.environment.darkness),
     },
     overlays: {
       opacity: Number(overlays.opacity ?? defaults.overlays.opacity),
@@ -190,7 +269,7 @@ function loadStoredSequenceConfig() {
     const saved = window.localStorage.getItem(BOOK_LAB_SEQUENCE_STORAGE_KEY);
     return normalizeSequenceConfig(saved ? JSON.parse(saved) : BOOK_LAB_DEFAULT_SEQUENCE);
   } catch (error) {
-    console.warn('[BookLab] Could not load saved sequence; using defaults.', error);
+    console.warn('[SequenceLab] Could not load saved sequence; using defaults.', error);
     return normalizeSequenceConfig(BOOK_LAB_DEFAULT_SEQUENCE);
   }
 }
@@ -199,20 +278,30 @@ function getSequenceConfigForExport() {
   return {
     progress: Number(sequenceState.progress.toFixed(4)),
     camera: {
-      hero: {
-        position: toFixedArray(sequenceState.camera.hero.position),
-        target: toFixedArray(sequenceState.camera.hero.target),
-      },
-      cover: {
-        position: toFixedArray(sequenceState.camera.cover.position),
-        target: toFixedArray(sequenceState.camera.cover.target),
-      },
-      pages: {
-        position: toFixedArray(sequenceState.camera.pages.position),
-        target: toFixedArray(sequenceState.camera.pages.target),
-      },
-      fov: Number(sequenceState.camera.fov.toFixed(4)),
-      distance: Number(sequenceState.camera.distance.toFixed(4)),
+      presets: Object.fromEntries(Object.keys(PRESET_LABELS).map((key) => ([
+        key,
+        {
+          position: toFixedArray(sequenceState.camera.presets[key].position),
+          target: toFixedArray(sequenceState.camera.presets[key].target),
+          fov: Number(sequenceState.camera.presets[key].fov.toFixed(4)),
+          distance: Number(sequenceState.camera.presets[key].distance.toFixed(4)),
+        },
+      ]))),
+    },
+    altar: {
+      position: toFixedArray(sequenceState.altar.position),
+      rotation: toFixedArray(sequenceState.altar.rotation),
+      scale: Number(sequenceState.altar.scale.toFixed(4)),
+    },
+    church: {
+      position: toFixedArray(sequenceState.church.position),
+      rotation: toFixedArray(sequenceState.church.rotation),
+      scale: Number(sequenceState.church.scale.toFixed(4)),
+      visible: sequenceState.church.visible,
+    },
+    environment: {
+      fog: Number(sequenceState.environment.fog.toFixed(4)),
+      darkness: Number(sequenceState.environment.darkness.toFixed(4)),
     },
     overlays: {
       opacity: Number(sequenceState.overlays.opacity.toFixed(4)),
@@ -239,7 +328,7 @@ const DEFAULTS = normalizeTransforms(BOOK_LAB_FINAL_TRANSFORMS);
 const state = loadStoredTransforms();
 const sequenceState = loadStoredSequenceConfig();
 const status = document.getElementById('status');
-const canvas = document.getElementById('bookLabCanvas');
+const canvas = document.getElementById('sequenceLabCanvas');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.8));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -252,7 +341,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color('#140604');
 scene.fog = new THREE.FogExp2('#140604', 0.035);
 
-const initialCameraFrame = getCameraFrame('hero');
+const initialCameraFrame = getCameraFrame('entrance');
 const camera = new THREE.PerspectiveCamera(initialCameraFrame.fov, 1, 0.1, 80);
 camera.position.copy(initialCameraFrame.position);
 
@@ -293,11 +382,17 @@ const surfaceHelper = new THREE.GridHelper(1.38, 8, '#f1d27a', '#6a3916');
 surfaceHelper.position.set(0, 2.025, 0.03);
 surfaceHelper.material.transparent = true;
 surfaceHelper.material.opacity = 0.48;
-scene.add(surfaceHelper);
+
+let churchRoot = null;
+
+const altarRig = new THREE.Group();
+altarRig.name = 'ApprovedLecternBibleAltarRig';
+scene.add(altarRig);
+altarRig.add(surfaceHelper);
 
 let bookRig = new THREE.Group();
 bookRig.name = 'BookRig';
-scene.add(bookRig);
+altarRig.add(bookRig);
 
 let animatedBook = null;
 let mixer = null;
@@ -629,7 +724,7 @@ function getDecalPlacement(coverNode) {
   const width = 1.56;
   const height = 1.5;
 
-  console.info('[BookLab] cover local placement', {
+  console.info('[SequenceLab] cover local placement', {
     cover: coverNode.name,
     coverFace: state.coverFace,
     basePosition: toFixedArray(position.toArray()),
@@ -684,22 +779,27 @@ function setAnimationProgress(value) {
 }
 
 function getCameraKey(presetName) {
-  if (presetName === 'hero_view' || presetName === 'hero') return 'hero';
-  if (presetName === 'cover_closeup' || presetName === 'cover') return 'cover';
-  if (presetName === 'open_pages_view' || presetName === 'open_pages_fullscreen' || presetName === 'pages') return 'pages';
-  return 'hero';
+  if (presetName === 'entrance') return 'entrance';
+  if (presetName === 'aisle') return 'aisle';
+  if (presetName === 'stage') return 'stage';
+  if (presetName === 'altar') return 'altar';
+  if (presetName === 'bible') return 'bible';
+  if (presetName === 'hero_view' || presetName === 'hero') return 'entrance';
+  if (presetName === 'cover_closeup' || presetName === 'cover') return 'stage';
+  if (presetName === 'open_pages_view' || presetName === 'open_pages_fullscreen' || presetName === 'pages') return 'bible';
+  return 'entrance';
 }
 
 function getCameraFrame(presetName) {
   const key = getCameraKey(presetName);
-  const raw = sequenceState.camera[key];
+  const raw = sequenceState.camera.presets[key];
   const target = new THREE.Vector3().fromArray(raw.target);
   const basePosition = new THREE.Vector3().fromArray(raw.position);
-  const position = target.clone().add(basePosition.sub(target).multiplyScalar(sequenceState.camera.distance));
+  const position = target.clone().add(basePosition.sub(target).multiplyScalar(raw.distance));
   return {
     position,
     target,
-    fov: sequenceState.camera.fov,
+    fov: raw.fov,
   };
 }
 
@@ -738,16 +838,14 @@ function setSequenceProgress(value) {
   sequenceState.progress = progress;
   let openProgress = 0;
 
-  if (progress < 0.3) {
-    setCameraGoal('hero_view');
+  if (progress < 0.25) {
+    mixPreset('entrance', 'aisle', progress / 0.25);
   } else if (progress < 0.55) {
-    mixPreset('hero_view', 'cover_closeup', (progress - 0.3) / 0.25);
-  } else if (progress < 0.75) {
-    setCameraGoal('cover_closeup');
-    openProgress = (progress - 0.55) / 0.2;
+    mixPreset('aisle', 'stage', (progress - 0.25) / 0.3);
+  } else if (progress < 0.82) {
+    mixPreset('stage', 'altar', (progress - 0.55) / 0.27);
   } else {
-    openProgress = 1;
-    mixPreset('cover_closeup', 'open_pages_fullscreen', (progress - 0.75) / 0.25);
+    setCameraGoal('altar');
   }
 
   const animationInput = document.getElementById('animationProgress');
@@ -801,11 +899,27 @@ function getSequenceValue(path) {
   if (parts[0] === 'progress') return sequenceState.progress;
 
   if (parts[0] === 'camera') {
-    if (parts.length === 2) return sequenceState.camera[parts[1]];
+    const presetKey = parts[1];
+    if (parts[2] === 'fov' || parts[2] === 'distance') return sequenceState.camera.presets[presetKey][parts[2]];
     const cameraKey = parts[1];
     const prop = parts[2];
     const axis = parts[3];
-    return sequenceState.camera[cameraKey][prop][getAxisIndex(axis)];
+    return sequenceState.camera.presets[cameraKey][prop][getAxisIndex(axis)];
+  }
+
+  if (parts[0] === 'altar') {
+    if (parts[1] === 'scale') return sequenceState.altar.scale;
+    return sequenceState.altar[parts[1]][getAxisIndex(parts[2])];
+  }
+
+  if (parts[0] === 'church') {
+    if (parts[1] === 'visible') return sequenceState.church.visible;
+    if (parts[1] === 'scale') return sequenceState.church.scale;
+    return sequenceState.church[parts[1]][getAxisIndex(parts[2])];
+  }
+
+  if (parts[0] === 'environment') {
+    return sequenceState.environment[parts[1]];
   }
 
   if (parts[0] === 'overlays') {
@@ -828,15 +942,45 @@ function setSequenceValue(path, rawValue, isChecked = false) {
   }
 
   if (parts[0] === 'camera') {
-    if (parts.length === 2) {
-      sequenceState.camera[parts[1]] = Number(rawValue);
+    const cameraKey = parts[1];
+    if (parts[2] === 'fov' || parts[2] === 'distance') {
+      sequenceState.camera.presets[cameraKey][parts[2]] = Number(rawValue);
     } else {
-      const cameraKey = parts[1];
       const prop = parts[2];
       const axis = parts[3];
-      sequenceState.camera[cameraKey][prop][getAxisIndex(axis)] = Number(rawValue);
+      sequenceState.camera.presets[cameraKey][prop][getAxisIndex(axis)] = Number(rawValue);
     }
     setSequenceProgress(sequenceState.progress);
+    return;
+  }
+
+  if (parts[0] === 'altar') {
+    if (parts[1] === 'scale') {
+      sequenceState.altar.scale = Number(rawValue);
+    } else {
+      sequenceState.altar[parts[1]][getAxisIndex(parts[2])] = Number(rawValue);
+    }
+    applyAltarTransform();
+    setSequenceProgress(sequenceState.progress);
+    updatePageOverlay();
+    return;
+  }
+
+  if (parts[0] === 'church') {
+    if (parts[1] === 'visible') {
+      sequenceState.church.visible = isChecked;
+    } else if (parts[1] === 'scale') {
+      sequenceState.church.scale = Number(rawValue);
+    } else {
+      sequenceState.church[parts[1]][getAxisIndex(parts[2])] = Number(rawValue);
+    }
+    applyChurchTransform();
+    return;
+  }
+
+  if (parts[0] === 'environment') {
+    sequenceState.environment[parts[1]] = Number(rawValue);
+    applyEnvironment();
     return;
   }
 
@@ -867,7 +1011,64 @@ function syncSequenceInputs() {
   });
 }
 
+function makeControlLabel(label, path, step = '0.05', type = 'number', attrs = '') {
+  return `<label>${label} <input data-seq="${path}" type="${type}" step="${step}" ${attrs} /></label>`;
+}
+
+function createJourneyPresetControls() {
+  const mount = document.getElementById('journeyPresetControls');
+  if (!mount) return;
+
+  mount.innerHTML = Object.entries(PRESET_LABELS).map(([key, label]) => `
+    <div class="control-section preset-control-group">
+      <p class="section-title">${label}</p>
+      <p class="section-help">Camera position is where the visitor stands. Camera target is where the visitor looks.</p>
+      ${makeControlLabel(HUMAN_AXIS_LABELS.position.x, `camera.${key}.position.x`)}
+      ${makeControlLabel(HUMAN_AXIS_LABELS.position.y, `camera.${key}.position.y`)}
+      ${makeControlLabel(HUMAN_AXIS_LABELS.position.z, `camera.${key}.position.z`)}
+      ${makeControlLabel(HUMAN_AXIS_LABELS.target.x, `camera.${key}.target.x`)}
+      ${makeControlLabel(HUMAN_AXIS_LABELS.target.y, `camera.${key}.target.y`)}
+      ${makeControlLabel(HUMAN_AXIS_LABELS.target.z, `camera.${key}.target.z`)}
+      ${makeControlLabel('Zoom In / Out', `camera.${key}.fov`, '1', 'number', 'min="12" max="70"')}
+      ${makeControlLabel('Camera Distance', `camera.${key}.distance`, '0.01', 'number', 'min="0.3" max="2.5"')}
+    </div>
+  `).join('');
+}
+
+function applyAltarTransform() {
+  altarRig.position.fromArray(sequenceState.altar.position);
+  altarRig.rotation.set(...sequenceState.altar.rotation.map(degToRad));
+  altarRig.scale.setScalar(sequenceState.altar.scale);
+}
+
+function applyChurchTransform() {
+  if (!churchRoot) return;
+  churchRoot.position.fromArray(sequenceState.church.position);
+  churchRoot.rotation.set(...sequenceState.church.rotation.map(degToRad));
+  churchRoot.scale.setScalar(sequenceState.church.scale);
+  churchRoot.visible = sequenceState.church.visible;
+}
+
+function applyEnvironment() {
+  scene.background = new THREE.Color().setRGB(
+    0.08 * (1 - sequenceState.environment.darkness),
+    0.045 * (1 - sequenceState.environment.darkness),
+    0.025 * (1 - sequenceState.environment.darkness),
+  );
+  scene.fog = new THREE.FogExp2('#090403', sequenceState.environment.fog);
+  if (churchRoot) {
+    const tone = THREE.MathUtils.lerp(1, 0.38, sequenceState.environment.darkness);
+    churchRoot.traverse((child) => {
+      if (!child.isMesh || !child.material?.color) return;
+      child.material.color.setScalar(tone);
+      child.material.needsUpdate = true;
+    });
+  }
+}
+
 function setupControls() {
+  createJourneyPresetControls();
+
   document.getElementById('animationProgress').addEventListener('input', (event) => {
     setAnimationProgress(event.target.value);
   });
@@ -879,7 +1080,7 @@ function setupControls() {
       const sequenceInput = document.getElementById('sequenceProgress');
 
       setCameraGoal(preset);
-      if (getCameraKey(preset) === 'pages') {
+      if (getCameraKey(preset) === 'bible') {
         if (animationInput) animationInput.value = '1';
         setAnimationProgress(1);
       } else {
@@ -887,7 +1088,7 @@ function setupControls() {
         setAnimationProgress(0);
       }
       if (sequenceInput) {
-        sequenceState.progress = getCameraKey(preset) === 'pages' ? 1 : 0;
+        sequenceState.progress = { entrance: 0, aisle: 0.25, stage: 0.55, altar: 1, bible: 1 }[getCameraKey(preset)] ?? 0;
         sequenceInput.value = String(sequenceState.progress);
       }
       syncSequenceInputs();
@@ -952,7 +1153,7 @@ function printValues() {
     openClipTimeRatio: OPEN_CLIP_TIME_RATIO,
     animationProgress: Number(document.getElementById('animationProgress').value),
   };
-  console.info('[BookLab] final transform values', payload);
+  console.info('[SequenceLab] final transform values', payload);
   setStatus('Printed final transform values to console.');
 }
 
@@ -964,12 +1165,12 @@ function resetToFinalApprovedValues() {
   attachDecalToCover(state.coverTarget);
   applyDecalTransform();
   updatePageOverlay();
-  setStatus('Reset to final approved book-lab values and saved them for reloads.');
+  setStatus('Reset to approved book and lectern placement.');
 }
 
 function printSequenceConfig() {
-  const configText = `const BOOK_LAB_DEFAULT_SEQUENCE = ${JSON.stringify(getSequenceConfigForExport(), null, 2)};`;
-  console.info('[BookLab] final sequence config\n%s', configText);
+  const configText = `const SEQUENCE_LAB_DEFAULT_SEQUENCE = ${JSON.stringify(getSequenceConfigForExport(), null, 2)};`;
+  console.info('[SequenceLab] final sequence config\n%s', configText);
   setStatus('Printed final sequence config to console.');
 }
 
@@ -983,12 +1184,18 @@ function resetSequenceConfig() {
   const next = normalizeSequenceConfig(BOOK_LAB_DEFAULT_SEQUENCE);
   sequenceState.progress = next.progress;
   sequenceState.camera = next.camera;
+  sequenceState.altar = next.altar;
+  sequenceState.church = next.church;
+  sequenceState.environment = next.environment;
   sequenceState.overlays = next.overlays;
   window.localStorage.removeItem(BOOK_LAB_SEQUENCE_STORAGE_KEY);
+  applyAltarTransform();
+  applyChurchTransform();
+  applyEnvironment();
   syncSequenceInputs();
   setSequenceProgress(sequenceState.progress);
   updatePageOverlay();
-  setStatus('Reset camera and page overlays to book-lab defaults.');
+  setStatus('Reset church sequence to defaults.');
 }
 
 function updatePageOverlay() {
@@ -1058,10 +1265,26 @@ async function init() {
   const loader = new GLTFLoader();
   loader.setMeshoptDecoder(MeshoptDecoder);
 
-  const [lecternGltf, bookGltf] = await Promise.all([
+  const [churchGltf, lecternGltf, bookGltf] = await Promise.all([
+    loader.loadAsync(ASSETS.church),
     loader.loadAsync(ASSETS.lectern),
     loader.loadAsync(ASSETS.book),
   ]);
+
+  churchRoot = churchGltf.scene;
+  churchRoot.name = 'ChurchInteriorScan';
+  churchRoot.traverse((child) => {
+    if (!child.isMesh) return;
+    child.castShadow = false;
+    child.receiveShadow = true;
+    if (child.material) {
+      child.material = child.material.clone();
+      child.material.toneMapped = true;
+    }
+  });
+  scene.add(churchRoot);
+  applyChurchTransform();
+  applyEnvironment();
 
   const lectern = lecternGltf.scene;
   normalizeToGround(lectern, LOCKED_LECTERN_TRANSFORM.targetHeight);
@@ -1072,7 +1295,8 @@ async function init() {
     child.castShadow = true;
     child.receiveShadow = true;
   });
-  scene.add(lectern);
+  altarRig.add(lectern);
+  applyAltarTransform();
 
   animatedBook = bookGltf.scene;
   tuneBookMaterials(animatedBook);
@@ -1108,8 +1332,8 @@ async function init() {
   attachDecalToCover(state.coverTarget);
   setSequenceProgress(sequenceState.progress);
 
-  setStatus('Book lab ready. Book and lectern transforms are locked; use presets, opening slider, and sequence test.');
-  console.info('[BookLab] animated book nodes', {
+  setStatus('Sequence lab ready. Approved book and lectern are locked; tune the church journey controls.');
+  console.info('[SequenceLab] animated book nodes', {
     coverCandidates: ['cover-r_35', 'cover-l_36'],
     animation: clip ? { name: clip.name, duration: clip.duration } : null,
   });
@@ -1135,6 +1359,6 @@ window.addEventListener('resize', resize, { passive: true });
 resize();
 init().catch((error) => {
   console.error(error);
-  setStatus(`Book lab failed to load: ${error.message}`);
+  setStatus(`Sequence lab failed to load: ${error.message}`);
 });
 render();

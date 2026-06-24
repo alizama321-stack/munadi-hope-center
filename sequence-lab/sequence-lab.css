@@ -25,12 +25,12 @@ body {
   color: var(--cream);
 }
 
-.book-lab-shell {
+.sequence-lab-shell {
   position: fixed;
   inset: 0;
 }
 
-#bookLabCanvas {
+#sequenceLabCanvas {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -109,6 +109,10 @@ h1 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 0.45rem;
+}
+
+.preset-row.five-up {
+  grid-template-columns: 1fr;
 }
 
 .preset-row button {
@@ -249,7 +253,7 @@ select:disabled {
     overflow: auto;
   }
 
-  .book-lab-shell {
+  .sequence-lab-shell {
     min-height: 100vh;
   }
 
