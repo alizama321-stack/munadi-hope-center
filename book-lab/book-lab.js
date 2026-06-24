@@ -9,6 +9,7 @@ const ASSETS = {
 };
 
 const BOOK_LAB_STORAGE_KEY = 'munadiHopeCenter.bookLab.transforms';
+const BOOK_LAB_SEQUENCE_STORAGE_KEY = 'munadiHopeCenter.bookLab.sequence';
 
 const LOCKED_LECTERN_TRANSFORM = {
   position: [0, 0, 0],
@@ -35,30 +36,39 @@ const BOOK_LAB_FINAL_TRANSFORMS = {
 
 const OPEN_CLIP_TIME_RATIO = 0.5;
 
-const CAMERA_PRESETS = {
-  hero_view: {
-    position: [2.35, 4.55, 3.45],
-    target: [0, 2.02, 0],
-    fov: 38,
+const BOOK_LAB_DEFAULT_SEQUENCE = {
+  progress: 0,
+  camera: {
+    hero: {
+      position: [2.15, 4.05, 3.25],
+      target: [-0.33, 2.05, -0.12],
+    },
+    cover: {
+      position: [-0.33, 3.18, 0.34],
+      target: [-0.33, 2.03, -0.12],
+    },
+    pages: {
+      position: [-0.33, 3.08, 0.02],
+      target: [-0.33, 2.02, -0.12],
+    },
+    fov: 20,
+    distance: 1,
   },
-  cover_closeup: {
-    position: [0.95, 2.95, 1.25],
-    target: [0, 2.06, 0.02],
-    fov: 30,
-  },
-  open_pages_view: {
-    position: [0.12, 3.32, 0.48],
-    target: [0, 2.08, 0.02],
-    fov: 24,
+  overlays: {
+    opacity: 0.86,
+    borderVisible: true,
+    left: {
+      position: [-0.92, -0.46, -0.08],
+      rotation: [0, 0, 0],
+      scale: [1.18, 0.84],
+    },
+    right: {
+      position: [0.55, -0.46, -0.03],
+      rotation: [0, 0, 0],
+      scale: [1.2, 0.84],
+    },
   },
 };
-
-const PAGE_ANCHORS = [
-  new THREE.Vector3(-1.92, -0.46, -1.13),
-  new THREE.Vector3(1.92, -0.46, -1.13),
-  new THREE.Vector3(-1.92, -0.46, 1.13),
-  new THREE.Vector3(1.92, -0.46, 1.13),
-];
 
 function cloneConfig(value) {
   return JSON.parse(JSON.stringify(value));
@@ -132,8 +142,102 @@ function setStateFromTransforms(transforms) {
   state.decal = next.decal;
 }
 
+function normalizeSequenceConfig(value = {}) {
+  const source = value || {};
+  const defaults = cloneConfig(BOOK_LAB_DEFAULT_SEQUENCE);
+  const camera = source.camera || {};
+  const overlays = source.overlays || {};
+  const left = overlays.left || {};
+  const right = overlays.right || {};
+
+  return {
+    progress: Number(source.progress ?? defaults.progress),
+    camera: {
+      hero: {
+        position: [...(camera.hero?.position || defaults.camera.hero.position)],
+        target: [...(camera.hero?.target || defaults.camera.hero.target)],
+      },
+      cover: {
+        position: [...(camera.cover?.position || defaults.camera.cover.position)],
+        target: [...(camera.cover?.target || defaults.camera.cover.target)],
+      },
+      pages: {
+        position: [...(camera.pages?.position || defaults.camera.pages.position)],
+        target: [...(camera.pages?.target || defaults.camera.pages.target)],
+      },
+      fov: Number(camera.fov ?? defaults.camera.fov),
+      distance: Number(camera.distance ?? defaults.camera.distance),
+    },
+    overlays: {
+      opacity: Number(overlays.opacity ?? defaults.overlays.opacity),
+      borderVisible: Boolean(overlays.borderVisible ?? defaults.overlays.borderVisible),
+      left: {
+        position: [...(left.position || defaults.overlays.left.position)],
+        rotation: [...(left.rotation || defaults.overlays.left.rotation)],
+        scale: [...(left.scale || defaults.overlays.left.scale)],
+      },
+      right: {
+        position: [...(right.position || defaults.overlays.right.position)],
+        rotation: [...(right.rotation || defaults.overlays.right.rotation)],
+        scale: [...(right.scale || defaults.overlays.right.scale)],
+      },
+    },
+  };
+}
+
+function loadStoredSequenceConfig() {
+  try {
+    const saved = window.localStorage.getItem(BOOK_LAB_SEQUENCE_STORAGE_KEY);
+    return normalizeSequenceConfig(saved ? JSON.parse(saved) : BOOK_LAB_DEFAULT_SEQUENCE);
+  } catch (error) {
+    console.warn('[BookLab] Could not load saved sequence; using defaults.', error);
+    return normalizeSequenceConfig(BOOK_LAB_DEFAULT_SEQUENCE);
+  }
+}
+
+function getSequenceConfigForExport() {
+  return {
+    progress: Number(sequenceState.progress.toFixed(4)),
+    camera: {
+      hero: {
+        position: toFixedArray(sequenceState.camera.hero.position),
+        target: toFixedArray(sequenceState.camera.hero.target),
+      },
+      cover: {
+        position: toFixedArray(sequenceState.camera.cover.position),
+        target: toFixedArray(sequenceState.camera.cover.target),
+      },
+      pages: {
+        position: toFixedArray(sequenceState.camera.pages.position),
+        target: toFixedArray(sequenceState.camera.pages.target),
+      },
+      fov: Number(sequenceState.camera.fov.toFixed(4)),
+      distance: Number(sequenceState.camera.distance.toFixed(4)),
+    },
+    overlays: {
+      opacity: Number(sequenceState.overlays.opacity.toFixed(4)),
+      borderVisible: sequenceState.overlays.borderVisible,
+      left: {
+        position: toFixedArray(sequenceState.overlays.left.position),
+        rotation: toFixedArray(sequenceState.overlays.left.rotation),
+        scale: toFixedArray(sequenceState.overlays.left.scale),
+      },
+      right: {
+        position: toFixedArray(sequenceState.overlays.right.position),
+        rotation: toFixedArray(sequenceState.overlays.right.rotation),
+        scale: toFixedArray(sequenceState.overlays.right.scale),
+      },
+    },
+  };
+}
+
+function persistSequenceConfig() {
+  window.localStorage.setItem(BOOK_LAB_SEQUENCE_STORAGE_KEY, JSON.stringify(getSequenceConfigForExport()));
+}
+
 const DEFAULTS = normalizeTransforms(BOOK_LAB_FINAL_TRANSFORMS);
 const state = loadStoredTransforms();
+const sequenceState = loadStoredSequenceConfig();
 const status = document.getElementById('status');
 const canvas = document.getElementById('bookLabCanvas');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
@@ -148,18 +252,19 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color('#140604');
 scene.fog = new THREE.FogExp2('#140604', 0.035);
 
-const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 80);
-camera.position.fromArray(CAMERA_PRESETS.hero_view.position);
+const initialCameraFrame = getCameraFrame('hero');
+const camera = new THREE.PerspectiveCamera(initialCameraFrame.fov, 1, 0.1, 80);
+camera.position.copy(initialCameraFrame.position);
 
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.fromArray(CAMERA_PRESETS.hero_view.target);
+controls.target.copy(initialCameraFrame.target);
 controls.enableDamping = true;
 controls.maxPolarAngle = Math.PI * 0.49;
 
 const cameraGoal = {
-  position: new THREE.Vector3().fromArray(CAMERA_PRESETS.hero_view.position),
-  target: new THREE.Vector3().fromArray(CAMERA_PRESETS.hero_view.target),
-  fov: CAMERA_PRESETS.hero_view.fov,
+  position: initialCameraFrame.position.clone(),
+  target: initialCameraFrame.target.clone(),
+  fov: initialCameraFrame.fov,
 };
 
 let currentOpenProgress = 0;
@@ -578,12 +683,31 @@ function setAnimationProgress(value) {
   updatePageOverlay();
 }
 
-function setCameraGoal(presetName, immediate = false) {
-  const preset = CAMERA_PRESETS[presetName];
-  if (!preset) return;
+function getCameraKey(presetName) {
+  if (presetName === 'hero_view' || presetName === 'hero') return 'hero';
+  if (presetName === 'cover_closeup' || presetName === 'cover') return 'cover';
+  if (presetName === 'open_pages_view' || presetName === 'open_pages_fullscreen' || presetName === 'pages') return 'pages';
+  return 'hero';
+}
 
-  cameraGoal.position.fromArray(preset.position);
-  cameraGoal.target.fromArray(preset.target);
+function getCameraFrame(presetName) {
+  const key = getCameraKey(presetName);
+  const raw = sequenceState.camera[key];
+  const target = new THREE.Vector3().fromArray(raw.target);
+  const basePosition = new THREE.Vector3().fromArray(raw.position);
+  const position = target.clone().add(basePosition.sub(target).multiplyScalar(sequenceState.camera.distance));
+  return {
+    position,
+    target,
+    fov: sequenceState.camera.fov,
+  };
+}
+
+function setCameraGoal(presetName, immediate = false) {
+  const preset = getCameraFrame(presetName);
+
+  cameraGoal.position.copy(preset.position);
+  cameraGoal.target.copy(preset.target);
   cameraGoal.fov = preset.fov;
 
   if (immediate) {
@@ -601,31 +725,35 @@ function smoothstep(value) {
 }
 
 function mixPreset(fromName, toName, t) {
-  const from = CAMERA_PRESETS[fromName];
-  const to = CAMERA_PRESETS[toName];
+  const from = getCameraFrame(fromName);
+  const to = getCameraFrame(toName);
   const eased = smoothstep(t);
-  cameraGoal.position.fromArray(from.position).lerp(new THREE.Vector3().fromArray(to.position), eased);
-  cameraGoal.target.fromArray(from.target).lerp(new THREE.Vector3().fromArray(to.target), eased);
+  cameraGoal.position.copy(from.position).lerp(to.position, eased);
+  cameraGoal.target.copy(from.target).lerp(to.target, eased);
   cameraGoal.fov = THREE.MathUtils.lerp(from.fov, to.fov, eased);
 }
 
 function setSequenceProgress(value) {
   const progress = THREE.MathUtils.clamp(Number(value), 0, 1);
+  sequenceState.progress = progress;
   let openProgress = 0;
 
-  if (progress < 0.34) {
-    mixPreset('hero_view', 'cover_closeup', progress / 0.34);
-  } else if (progress < 0.72) {
+  if (progress < 0.3) {
+    setCameraGoal('hero_view');
+  } else if (progress < 0.55) {
+    mixPreset('hero_view', 'cover_closeup', (progress - 0.3) / 0.25);
+  } else if (progress < 0.75) {
     setCameraGoal('cover_closeup');
-    openProgress = (progress - 0.34) / 0.38;
+    openProgress = (progress - 0.55) / 0.2;
   } else {
     openProgress = 1;
-    mixPreset('cover_closeup', 'open_pages_view', (progress - 0.72) / 0.28);
+    mixPreset('cover_closeup', 'open_pages_fullscreen', (progress - 0.75) / 0.25);
   }
 
   const animationInput = document.getElementById('animationProgress');
   if (animationInput) animationInput.value = String(openProgress);
   setAnimationProgress(openProgress);
+  syncSequenceInputs();
 }
 
 function updateCamera() {
@@ -640,7 +768,7 @@ function updatePageSpread(opacity = smoothstep((currentOpenProgress - 0.8) / 0.2
   pageSpread.visible = opacity > 0.01;
   pageSpread.traverse((child) => {
     if (!child.isMesh || !child.material) return;
-    child.material.opacity = opacity;
+    child.material.opacity = child.name === 'BookLabPageCrease' ? opacity * 0.36 : opacity * 0.78;
     child.material.needsUpdate = true;
   });
 }
@@ -664,13 +792,84 @@ function syncInputs() {
   });
 }
 
+function getAxisIndex(axis) {
+  return { x: 0, y: 1, z: 2 }[axis];
+}
+
+function getSequenceValue(path) {
+  const parts = path.split('.');
+  if (parts[0] === 'progress') return sequenceState.progress;
+
+  if (parts[0] === 'camera') {
+    if (parts.length === 2) return sequenceState.camera[parts[1]];
+    const cameraKey = parts[1];
+    const prop = parts[2];
+    const axis = parts[3];
+    return sequenceState.camera[cameraKey][prop][getAxisIndex(axis)];
+  }
+
+  if (parts[0] === 'overlays') {
+    if (parts.length === 2) return sequenceState.overlays[parts[1]];
+    const side = parts[1];
+    const prop = parts[2];
+    const axis = parts[3];
+    const axisIndex = prop === 'scale' ? { x: 0, y: 1 }[axis] : getAxisIndex(axis);
+    return sequenceState.overlays[side][prop][axisIndex];
+  }
+
+  return '';
+}
+
+function setSequenceValue(path, rawValue, isChecked = false) {
+  const parts = path.split('.');
+  if (parts[0] === 'progress') {
+    setSequenceProgress(rawValue);
+    return;
+  }
+
+  if (parts[0] === 'camera') {
+    if (parts.length === 2) {
+      sequenceState.camera[parts[1]] = Number(rawValue);
+    } else {
+      const cameraKey = parts[1];
+      const prop = parts[2];
+      const axis = parts[3];
+      sequenceState.camera[cameraKey][prop][getAxisIndex(axis)] = Number(rawValue);
+    }
+    setSequenceProgress(sequenceState.progress);
+    return;
+  }
+
+  if (parts[0] === 'overlays') {
+    if (parts[1] === 'borderVisible') {
+      sequenceState.overlays.borderVisible = isChecked;
+    } else if (parts[1] === 'opacity') {
+      sequenceState.overlays.opacity = Number(rawValue);
+    } else {
+      const side = parts[1];
+      const prop = parts[2];
+      const axis = parts[3];
+      const axisIndex = prop === 'scale' ? { x: 0, y: 1 }[axis] : getAxisIndex(axis);
+      sequenceState.overlays[side][prop][axisIndex] = Number(rawValue);
+    }
+    updatePageOverlay();
+  }
+}
+
+function syncSequenceInputs() {
+  document.querySelectorAll('[data-seq]').forEach((input) => {
+    const value = getSequenceValue(input.dataset.seq);
+    if (input.type === 'checkbox') {
+      input.checked = Boolean(value);
+    } else {
+      input.value = value;
+    }
+  });
+}
+
 function setupControls() {
   document.getElementById('animationProgress').addEventListener('input', (event) => {
     setAnimationProgress(event.target.value);
-  });
-
-  document.getElementById('sequenceProgress').addEventListener('input', (event) => {
-    setSequenceProgress(event.target.value);
   });
 
   document.querySelectorAll('[data-camera-preset]').forEach((button) => {
@@ -680,14 +879,18 @@ function setupControls() {
       const sequenceInput = document.getElementById('sequenceProgress');
 
       setCameraGoal(preset);
-      if (preset === 'open_pages_view') {
+      if (getCameraKey(preset) === 'pages') {
         if (animationInput) animationInput.value = '1';
         setAnimationProgress(1);
       } else {
         if (animationInput) animationInput.value = '0';
         setAnimationProgress(0);
       }
-      if (sequenceInput) sequenceInput.value = preset === 'open_pages_view' ? '1' : '0';
+      if (sequenceInput) {
+        sequenceState.progress = getCameraKey(preset) === 'pages' ? 1 : 0;
+        sequenceInput.value = String(sequenceState.progress);
+      }
+      syncSequenceInputs();
     });
   });
 
@@ -726,9 +929,19 @@ function setupControls() {
   });
 
   document.getElementById('printValues').addEventListener('click', printValues);
-  document.getElementById('saveDefault').addEventListener('click', saveCurrentAsDefault);
   document.getElementById('resetDefaults').addEventListener('click', resetToFinalApprovedValues);
+  document.getElementById('printSequence').addEventListener('click', printSequenceConfig);
+  document.getElementById('saveSequence').addEventListener('click', saveCurrentSequence);
+  document.getElementById('resetSequence').addEventListener('click', resetSequenceConfig);
+
+  document.querySelectorAll('[data-seq]').forEach((input) => {
+    input.addEventListener('input', () => {
+      setSequenceValue(input.dataset.seq, input.value, input.checked);
+    });
+  });
+
   syncInputs();
+  syncSequenceInputs();
 }
 
 function printValues() {
@@ -736,19 +949,11 @@ function printValues() {
     BOOK_LAB_FINAL_TRANSFORMS: getCurrentTransforms(),
     lectern: structuredClone(LOCKED_LECTERN_TRANSFORM),
     decalParent: currentCoverNode?.name || null,
-    cameraPresets: structuredClone(CAMERA_PRESETS),
     openClipTimeRatio: OPEN_CLIP_TIME_RATIO,
     animationProgress: Number(document.getElementById('animationProgress').value),
   };
   console.info('[BookLab] final transform values', payload);
   setStatus('Printed final transform values to console.');
-}
-
-function saveCurrentAsDefault() {
-  persistTransforms();
-  const configText = `const BOOK_LAB_FINAL_TRANSFORMS = ${JSON.stringify(getCurrentTransforms(), null, 2)};`;
-  console.info('[BookLab] copy-paste-ready config\n%s', configText);
-  setStatus('Saved current calibration in this browser and printed copy-paste-ready config to console.');
 }
 
 function resetToFinalApprovedValues() {
@@ -762,38 +967,89 @@ function resetToFinalApprovedValues() {
   setStatus('Reset to final approved book-lab values and saved them for reloads.');
 }
 
+function printSequenceConfig() {
+  const configText = `const BOOK_LAB_DEFAULT_SEQUENCE = ${JSON.stringify(getSequenceConfigForExport(), null, 2)};`;
+  console.info('[BookLab] final sequence config\n%s', configText);
+  setStatus('Printed final sequence config to console.');
+}
+
+function saveCurrentSequence() {
+  persistSequenceConfig();
+  printSequenceConfig();
+  setStatus('Saved current camera/page overlay sequence to localStorage.');
+}
+
+function resetSequenceConfig() {
+  const next = normalizeSequenceConfig(BOOK_LAB_DEFAULT_SEQUENCE);
+  sequenceState.progress = next.progress;
+  sequenceState.camera = next.camera;
+  sequenceState.overlays = next.overlays;
+  window.localStorage.removeItem(BOOK_LAB_SEQUENCE_STORAGE_KEY);
+  syncSequenceInputs();
+  setSequenceProgress(sequenceState.progress);
+  updatePageOverlay();
+  setStatus('Reset camera and page overlays to book-lab defaults.');
+}
+
 function updatePageOverlay() {
   const overlay = document.getElementById('pageOverlayTest');
   if (!overlay || !bookRig) return;
 
-  const opacity = smoothstep((currentOpenProgress - 0.82) / 0.18);
-  updatePageSpread(opacity);
-  overlay.style.setProperty('--page-overlay-opacity', opacity.toFixed(3));
+  const reveal = smoothstep((currentOpenProgress - 0.82) / 0.18);
+  const opacity = reveal * sequenceState.overlays.opacity;
+  updatePageSpread(reveal);
+  positionPageSafeArea('leftPageSafeArea', sequenceState.overlays.left, opacity);
+  positionPageSafeArea('rightPageSafeArea', sequenceState.overlays.right, opacity);
+}
+
+function positionPageSafeArea(id, config, opacity) {
+  const element = document.getElementById(id);
+  if (!element) return;
+
+  element.style.setProperty('--page-overlay-opacity', opacity.toFixed(3));
+  element.style.setProperty('--safe-border-opacity', sequenceState.overlays.borderVisible ? '0.2' : '0');
 
   if (opacity <= 0.001) return;
 
-  bookRig.updateWorldMatrix(true, true);
-  const points = PAGE_ANCHORS.map((point) => bookRig.localToWorld(point.clone()).project(camera));
-  const visible = points.every((point) => point.z > -1 && point.z < 1);
+  const areaObject = new THREE.Object3D();
+  areaObject.position.fromArray(config.position);
+  areaObject.rotation.set(...config.rotation.map(degToRad));
+  areaObject.updateMatrix();
+
+  const width = Math.max(0.05, config.scale[0]);
+  const height = Math.max(0.05, config.scale[1]);
+  const corners = [
+    new THREE.Vector3(-width / 2, 0, -height / 2),
+    new THREE.Vector3(width / 2, 0, -height / 2),
+    new THREE.Vector3(-width / 2, 0, height / 2),
+    new THREE.Vector3(width / 2, 0, height / 2),
+  ].map((corner) => {
+    const world = bookRig.localToWorld(corner.applyMatrix4(areaObject.matrix));
+    return world.project(camera);
+  });
+
+  const visible = corners.every((point) => point.z > -1 && point.z < 1);
   if (!visible) {
-    overlay.style.setProperty('--page-overlay-opacity', '0');
+    element.style.setProperty('--page-overlay-opacity', '0');
     return;
   }
 
-  const xs = points.map((point) => (point.x * 0.5 + 0.5) * window.innerWidth);
-  const ys = points.map((point) => (-point.y * 0.5 + 0.5) * window.innerHeight);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  const width = THREE.MathUtils.clamp(maxX - minX, 260, Math.min(680, window.innerWidth - 32));
-  const height = THREE.MathUtils.clamp(maxY - minY, 118, Math.min(260, window.innerHeight * 0.34));
+  const screen = corners.map((point) => ({
+    x: (point.x * 0.5 + 0.5) * window.innerWidth,
+    y: (-point.y * 0.5 + 0.5) * window.innerHeight,
+  }));
+  const centerX = screen.reduce((sum, point) => sum + point.x, 0) / screen.length;
+  const centerY = screen.reduce((sum, point) => sum + point.y, 0) / screen.length;
+  const screenWidth = Math.hypot(screen[1].x - screen[0].x, screen[1].y - screen[0].y);
+  const screenHeight = Math.hypot(screen[2].x - screen[0].x, screen[2].y - screen[0].y);
+  const rotation = Math.atan2(screen[1].y - screen[0].y, screen[1].x - screen[0].x);
 
-  overlay.style.left = `${(minX + maxX) / 2}px`;
-  overlay.style.top = `${(minY + maxY) / 2}px`;
-  overlay.style.width = `${width}px`;
-  overlay.style.minHeight = `${height}px`;
-  overlay.style.setProperty('--page-tilt', '-7deg');
+  element.style.setProperty('--safe-left', `${centerX}px`);
+  element.style.setProperty('--safe-top', `${centerY}px`);
+  element.style.setProperty('--safe-width', `${THREE.MathUtils.clamp(screenWidth, 120, window.innerWidth * 0.72)}px`);
+  element.style.setProperty('--safe-height', `${THREE.MathUtils.clamp(screenHeight, 80, window.innerHeight * 0.52)}px`);
+  element.style.setProperty('--safe-rotation', `${rotation}rad`);
+  element.style.setProperty('--safe-scale', '1');
 }
 
 async function init() {
@@ -850,6 +1106,7 @@ async function init() {
   decal.name = 'MunadiCoverDecal';
   decal.renderOrder = 20;
   attachDecalToCover(state.coverTarget);
+  setSequenceProgress(sequenceState.progress);
 
   setStatus('Book lab ready. Book and lectern transforms are locked; use presets, opening slider, and sequence test.');
   console.info('[BookLab] animated book nodes', {

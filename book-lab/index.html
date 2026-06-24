@@ -28,14 +28,14 @@
         <div class="control-grid" id="controls">
           <label>
             Cover node
-            <select id="coverTarget">
+            <select id="coverTarget" disabled>
               <option value="cover-r_35">cover-r_35</option>
               <option value="cover-l_36" selected>cover-l_36</option>
             </select>
           </label>
           <label>
             Cover face
-            <select id="coverFace">
+            <select id="coverFace" disabled>
               <option value="-1">front / top</option>
               <option value="1">back / underside</option>
             </select>
@@ -44,41 +44,106 @@
           <div class="preset-row" aria-label="Camera presets">
             <button type="button" data-camera-preset="hero_view">Hero</button>
             <button type="button" data-camera-preset="cover_closeup">Cover</button>
-            <button type="button" data-camera-preset="open_pages_view">Pages</button>
+            <button type="button" data-camera-preset="open_pages_fullscreen">Pages</button>
           </div>
+          <p class="section-help">Hero = right-side book composition. Cover = top-down closed cover view. Pages = full-screen open Bible view.</p>
 
           <label>Animation open <input id="animationProgress" type="range" min="0" max="1" step="0.001" value="0" /></label>
-          <label>Sequence test <input id="sequenceProgress" type="range" min="0" max="1" step="0.001" value="0" /></label>
+          <label>Sequence progress <input id="sequenceProgress" type="range" min="0" max="1" step="0.001" value="0" data-seq="progress" /></label>
 
-          <label>Book X <input data-bind="book.position.x" type="number" step="0.01" /></label>
-          <label>Book Y <input data-bind="book.position.y" type="number" step="0.01" /></label>
-          <label>Book Z <input data-bind="book.position.z" type="number" step="0.01" /></label>
-          <label>Book rot X <input data-bind="book.rotation.x" type="number" step="1" /></label>
-          <label>Book rot Y <input data-bind="book.rotation.y" type="number" step="1" /></label>
-          <label>Book rot Z <input data-bind="book.rotation.z" type="number" step="1" /></label>
-          <label>Book scale <input data-bind="book.scale" type="number" step="0.01" /></label>
+          <div class="control-section">
+            <p class="section-title">Approved Book Placement</p>
+            <p class="section-help">Book and lectern are locked as the physical anchor. These values are reference-only.</p>
+          </div>
 
-          <label>Decal X <input data-bind="decal.position.x" type="number" step="0.005" /></label>
-          <label>Decal Y <input data-bind="decal.position.y" type="number" step="0.005" /></label>
-          <label>Decal Z <input data-bind="decal.position.z" type="number" step="0.005" /></label>
-          <label>Decal rot X <input data-bind="decal.rotation.x" type="number" step="1" /></label>
-          <label>Decal rot Y <input data-bind="decal.rotation.y" type="number" step="1" /></label>
-          <label>Decal rot Z <input data-bind="decal.rotation.z" type="number" step="1" /></label>
-          <label>Decal scale X <input data-bind="decal.scale.x" type="number" step="0.01" /></label>
-          <label>Decal scale Y <input data-bind="decal.scale.y" type="number" step="0.01" /></label>
+          <label>Book X <input data-bind="book.position.x" type="number" step="0.01" disabled /></label>
+          <label>Book Y <input data-bind="book.position.y" type="number" step="0.01" disabled /></label>
+          <label>Book Z <input data-bind="book.position.z" type="number" step="0.01" disabled /></label>
+          <label>Book rot X <input data-bind="book.rotation.x" type="number" step="1" disabled /></label>
+          <label>Book rot Y <input data-bind="book.rotation.y" type="number" step="1" disabled /></label>
+          <label>Book rot Z <input data-bind="book.rotation.z" type="number" step="1" disabled /></label>
+          <label>Book scale <input data-bind="book.scale" type="number" step="0.01" disabled /></label>
+
+          <label>Decal X <input data-bind="decal.position.x" type="number" step="0.005" disabled /></label>
+          <label>Decal Y <input data-bind="decal.position.y" type="number" step="0.005" disabled /></label>
+          <label>Decal Z <input data-bind="decal.position.z" type="number" step="0.005" disabled /></label>
+          <label>Decal rot X <input data-bind="decal.rotation.x" type="number" step="1" disabled /></label>
+          <label>Decal rot Y <input data-bind="decal.rotation.y" type="number" step="1" disabled /></label>
+          <label>Decal rot Z <input data-bind="decal.rotation.z" type="number" step="1" disabled /></label>
+          <label>Decal scale X <input data-bind="decal.scale.x" type="number" step="0.01" disabled /></label>
+          <label>Decal scale Y <input data-bind="decal.scale.y" type="number" step="0.01" disabled /></label>
+
+          <div class="control-section">
+            <p class="section-title">Sequence Camera Controls</p>
+            <p class="section-help">Tune the camera path while the book stays fixed.</p>
+          </div>
+
+          <label>Hero cam X <input data-seq="camera.hero.position.x" type="number" step="0.01" /></label>
+          <label>Hero cam Y <input data-seq="camera.hero.position.y" type="number" step="0.01" /></label>
+          <label>Hero cam Z <input data-seq="camera.hero.position.z" type="number" step="0.01" /></label>
+          <label>Hero target X <input data-seq="camera.hero.target.x" type="number" step="0.01" /></label>
+          <label>Hero target Y <input data-seq="camera.hero.target.y" type="number" step="0.01" /></label>
+          <label>Hero target Z <input data-seq="camera.hero.target.z" type="number" step="0.01" /></label>
+
+          <label>Cover cam X <input data-seq="camera.cover.position.x" type="number" step="0.01" /></label>
+          <label>Cover cam Y <input data-seq="camera.cover.position.y" type="number" step="0.01" /></label>
+          <label>Cover cam Z <input data-seq="camera.cover.position.z" type="number" step="0.01" /></label>
+          <label>Cover target X <input data-seq="camera.cover.target.x" type="number" step="0.01" /></label>
+          <label>Cover target Y <input data-seq="camera.cover.target.y" type="number" step="0.01" /></label>
+          <label>Cover target Z <input data-seq="camera.cover.target.z" type="number" step="0.01" /></label>
+
+          <label>Pages cam X <input data-seq="camera.pages.position.x" type="number" step="0.01" /></label>
+          <label>Pages cam Y <input data-seq="camera.pages.position.y" type="number" step="0.01" /></label>
+          <label>Pages cam Z <input data-seq="camera.pages.position.z" type="number" step="0.01" /></label>
+          <label>Pages target X <input data-seq="camera.pages.target.x" type="number" step="0.01" /></label>
+          <label>Pages target Y <input data-seq="camera.pages.target.y" type="number" step="0.01" /></label>
+          <label>Pages target Z <input data-seq="camera.pages.target.z" type="number" step="0.01" /></label>
+          <label>Camera FOV <input data-seq="camera.fov" type="number" step="1" min="12" max="60" /></label>
+          <label>Zoom/distance <input data-seq="camera.distance" type="number" step="0.01" min="0.4" max="2.5" /></label>
+
+          <div class="control-section">
+            <p class="section-title">Page Overlay Controls</p>
+            <p class="section-help">Page overlays = where website content will sit later.</p>
+          </div>
+
+          <label>Left page X <input data-seq="overlays.left.position.x" type="number" step="0.01" /></label>
+          <label>Left page Y <input data-seq="overlays.left.position.y" type="number" step="0.01" /></label>
+          <label>Left page Z <input data-seq="overlays.left.position.z" type="number" step="0.01" /></label>
+          <label>Left rot X <input data-seq="overlays.left.rotation.x" type="number" step="1" /></label>
+          <label>Left rot Y <input data-seq="overlays.left.rotation.y" type="number" step="1" /></label>
+          <label>Left rot Z <input data-seq="overlays.left.rotation.z" type="number" step="1" /></label>
+          <label>Left scale X <input data-seq="overlays.left.scale.x" type="number" step="0.01" /></label>
+          <label>Left scale Y <input data-seq="overlays.left.scale.y" type="number" step="0.01" /></label>
+
+          <label>Right page X <input data-seq="overlays.right.position.x" type="number" step="0.01" /></label>
+          <label>Right page Y <input data-seq="overlays.right.position.y" type="number" step="0.01" /></label>
+          <label>Right page Z <input data-seq="overlays.right.position.z" type="number" step="0.01" /></label>
+          <label>Right rot X <input data-seq="overlays.right.rotation.x" type="number" step="1" /></label>
+          <label>Right rot Y <input data-seq="overlays.right.rotation.y" type="number" step="1" /></label>
+          <label>Right rot Z <input data-seq="overlays.right.rotation.z" type="number" step="1" /></label>
+          <label>Right scale X <input data-seq="overlays.right.scale.x" type="number" step="0.01" /></label>
+          <label>Right scale Y <input data-seq="overlays.right.scale.y" type="number" step="0.01" /></label>
+          <label>Overlay opacity <input data-seq="overlays.opacity" type="number" step="0.05" min="0" max="1" /></label>
+          <label class="toggle-label">Show borders <input data-seq="overlays.borderVisible" type="checkbox" /></label>
         </div>
 
         <div class="button-stack">
-          <button class="print-button" id="printValues" type="button">Print final values</button>
-          <button class="print-button" id="saveDefault" type="button">Save current as default</button>
-          <button class="print-button secondary" id="resetDefaults" type="button">Reset to final approved values</button>
+          <button class="print-button" id="printValues" type="button">Print final book config</button>
+          <button class="print-button secondary" id="resetDefaults" type="button">Reset to approved book placement</button>
+          <button class="print-button" id="printSequence" type="button">Print final sequence config</button>
+          <button class="print-button" id="saveSequence" type="button">Save current sequence to localStorage</button>
+          <button class="print-button secondary" id="resetSequence" type="button">Reset camera/page overlays</button>
         </div>
         <p class="status" id="status">Loading animated book...</p>
       </section>
 
       <div class="page-overlay-test" id="pageOverlayTest" aria-hidden="true">
-        <div class="page-text left-page">Hope begins here.</div>
-        <div class="page-text right-page">You are welcome.</div>
+        <div class="page-safe-area leftPageSafeArea" id="leftPageSafeArea">
+          <div class="page-text">Hope begins here.</div>
+        </div>
+        <div class="page-safe-area rightPageSafeArea" id="rightPageSafeArea">
+          <div class="page-text">You are welcome.</div>
+        </div>
       </div>
     </main>
 
