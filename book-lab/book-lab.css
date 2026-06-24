@@ -125,16 +125,27 @@ input[type="range"] {
   padding: 0;
 }
 
+.button-stack {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+}
+
 .print-button {
   width: 100%;
   min-height: 40px;
-  margin-top: 0.85rem;
   border: 1px solid rgba(241, 210, 122, 0.58);
   border-radius: 6px;
   background: linear-gradient(180deg, rgba(241, 210, 122, 0.24), rgba(215, 167, 66, 0.12));
   color: var(--gold-light);
   cursor: pointer;
   font-weight: 900;
+}
+
+.print-button.secondary {
+  border-color: rgba(255, 248, 232, 0.24);
+  background: rgba(255, 248, 232, 0.08);
+  color: rgba(255, 248, 232, 0.78);
 }
 
 .page-overlay-test {

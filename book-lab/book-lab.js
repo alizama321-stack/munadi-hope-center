@@ -8,11 +8,7 @@ const ASSETS = {
   lectern: '/public/assets/models/optimized/lectern.glb',
 };
 
-const LOCKED_BOOK_TRANSFORM = {
-  position: [0, 2.03, 0.03],
-  rotation: [0, 0, 180],
-  scale: 0.32,
-};
+const BOOK_LAB_STORAGE_KEY = 'munadiHopeCenter.bookLab.transforms';
 
 const LOCKED_LECTERN_TRANSFORM = {
   position: [0, 0, 0],
@@ -20,12 +16,21 @@ const LOCKED_LECTERN_TRANSFORM = {
   targetHeight: 2.05,
 };
 
-const LOCKED_DECAL_TRANSFORM = {
-  coverTarget: 'cover-l_36',
-  coverFace: -1,
-  position: [0, 0, 0],
-  rotation: [0, 0, 0],
-  scale: [1.02, 1.02],
+const BOOK_LAB_FINAL_TRANSFORMS = {
+  cover: {
+    target: 'cover-l_36',
+    face: 1,
+  },
+  book: {
+    position: [-0.33, 2.02, -0.12],
+    rotation: [18, 0, 360],
+    scale: 0.26,
+  },
+  decal: {
+    position: [0, 0, 0],
+    rotation: [0, 0, 180],
+    scale: [1.36, 1.35],
+  },
 };
 
 const OPEN_CLIP_TIME_RATIO = 0.5;
@@ -55,18 +60,80 @@ const PAGE_ANCHORS = [
   new THREE.Vector3(1.92, -0.46, 1.13),
 ];
 
-const DEFAULTS = {
-  coverTarget: LOCKED_DECAL_TRANSFORM.coverTarget,
-  coverFace: LOCKED_DECAL_TRANSFORM.coverFace,
-  book: structuredClone(LOCKED_BOOK_TRANSFORM),
-  decal: {
-    position: [...LOCKED_DECAL_TRANSFORM.position],
-    rotation: [...LOCKED_DECAL_TRANSFORM.rotation],
-    scale: [...LOCKED_DECAL_TRANSFORM.scale],
-  },
-};
+function cloneConfig(value) {
+  return JSON.parse(JSON.stringify(value));
+}
 
-const state = structuredClone(DEFAULTS);
+function normalizeTransforms(value = {}) {
+  const source = value || {};
+  const cover = source.cover || {};
+  const book = source.book || {};
+  const decal = source.decal || {};
+  const final = cloneConfig(BOOK_LAB_FINAL_TRANSFORMS);
+
+  return {
+    coverTarget: cover.target ?? source.coverTarget ?? final.cover.target,
+    coverFace: Number(cover.face ?? source.coverFace ?? final.cover.face),
+    book: {
+      position: [...(book.position || final.book.position)],
+      rotation: [...(book.rotation || final.book.rotation)],
+      scale: Number(book.scale ?? final.book.scale),
+    },
+    decal: {
+      position: [...(decal.position || final.decal.position)],
+      rotation: [...(decal.rotation || final.decal.rotation)],
+      scale: [...(decal.scale || final.decal.scale)],
+    },
+  };
+}
+
+function getCurrentTransforms() {
+  return {
+    cover: {
+      target: state.coverTarget,
+      face: state.coverFace,
+    },
+    book: {
+      position: toFixedArray(state.book.position),
+      rotation: toFixedArray(state.book.rotation),
+      scale: Number(state.book.scale.toFixed(4)),
+    },
+    decal: {
+      position: toFixedArray(state.decal.position),
+      rotation: toFixedArray(state.decal.rotation),
+      scale: toFixedArray(state.decal.scale),
+    },
+  };
+}
+
+function loadStoredTransforms() {
+  try {
+    const saved = window.localStorage.getItem(BOOK_LAB_STORAGE_KEY);
+    return normalizeTransforms(saved ? JSON.parse(saved) : DEFAULTS);
+  } catch (error) {
+    console.warn('[BookLab] Could not load saved calibration; using final approved values.', error);
+    return cloneConfig(DEFAULTS);
+  }
+}
+
+function persistTransforms() {
+  try {
+    window.localStorage.setItem(BOOK_LAB_STORAGE_KEY, JSON.stringify(getCurrentTransforms()));
+  } catch (error) {
+    console.warn('[BookLab] Could not save calibration.', error);
+  }
+}
+
+function setStateFromTransforms(transforms) {
+  const next = normalizeTransforms(transforms);
+  state.coverTarget = next.coverTarget;
+  state.coverFace = next.coverFace;
+  state.book = next.book;
+  state.decal = next.decal;
+}
+
+const DEFAULTS = normalizeTransforms(BOOK_LAB_FINAL_TRANSFORMS);
+const state = loadStoredTransforms();
 const status = document.getElementById('status');
 const canvas = document.getElementById('bookLabCanvas');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
@@ -483,9 +550,9 @@ function attachDecalToCover(name) {
 }
 
 function applyBookTransform() {
-  bookRig.position.fromArray(LOCKED_BOOK_TRANSFORM.position);
-  bookRig.rotation.set(...LOCKED_BOOK_TRANSFORM.rotation.map(degToRad));
-  bookRig.scale.setScalar(LOCKED_BOOK_TRANSFORM.scale);
+  bookRig.position.fromArray(state.book.position);
+  bookRig.rotation.set(...state.book.rotation.map(degToRad));
+  bookRig.scale.setScalar(state.book.scale);
 }
 
 function applyDecalTransform() {
@@ -579,8 +646,16 @@ function updatePageSpread(opacity = smoothstep((currentOpenProgress - 0.8) / 0.2
 }
 
 function syncInputs() {
+  document.getElementById('coverTarget').value = state.coverTarget;
+  document.getElementById('coverFace').value = String(state.coverFace);
+
   document.querySelectorAll('[data-bind]').forEach((input) => {
     const [group, prop, axis] = input.dataset.bind.split('.');
+    if (group === 'book') {
+      if (prop === 'position') input.value = state.book.position[{ x: 0, y: 1, z: 2 }[axis]];
+      if (prop === 'rotation') input.value = state.book.rotation[{ x: 0, y: 1, z: 2 }[axis]];
+      if (prop === 'scale') input.value = state.book.scale;
+    }
     if (group === 'decal') {
       if (prop === 'position') input.value = state.decal.position[{ x: 0, y: 1, z: 2 }[axis]];
       if (prop === 'rotation') input.value = state.decal.rotation[{ x: 0, y: 1, z: 2 }[axis]];
@@ -619,52 +694,72 @@ function setupControls() {
   document.getElementById('coverTarget').addEventListener('change', (event) => {
     state.coverTarget = event.target.value;
     attachDecalToCover(state.coverTarget);
+    persistTransforms();
   });
 
   document.getElementById('coverFace').addEventListener('change', (event) => {
     state.coverFace = Number(event.target.value);
     attachDecalToCover(state.coverTarget);
+    persistTransforms();
   });
 
   document.querySelectorAll('[data-bind]').forEach((input) => {
     input.addEventListener('input', () => {
       const value = Number(input.value);
       const [group, prop, axis] = input.dataset.bind.split('.');
+      if (group === 'book') {
+        if (prop === 'position') state.book.position[{ x: 0, y: 1, z: 2 }[axis]] = value;
+        if (prop === 'rotation') state.book.rotation[{ x: 0, y: 1, z: 2 }[axis]] = value;
+        if (prop === 'scale') state.book.scale = value;
+        applyBookTransform();
+        updatePageOverlay();
+        persistTransforms();
+      }
       if (group === 'decal') {
         if (prop === 'position') state.decal.position[{ x: 0, y: 1, z: 2 }[axis]] = value;
         if (prop === 'rotation') state.decal.rotation[{ x: 0, y: 1, z: 2 }[axis]] = value;
         if (prop === 'scale') state.decal.scale[{ x: 0, y: 1 }[axis]] = value;
         applyDecalTransform();
+        persistTransforms();
       }
     });
   });
 
   document.getElementById('printValues').addEventListener('click', printValues);
+  document.getElementById('saveDefault').addEventListener('click', saveCurrentAsDefault);
+  document.getElementById('resetDefaults').addEventListener('click', resetToFinalApprovedValues);
   syncInputs();
 }
 
 function printValues() {
   const payload = {
-    coverTarget: state.coverTarget,
-    coverFace: state.coverFace,
+    BOOK_LAB_FINAL_TRANSFORMS: getCurrentTransforms(),
     lectern: structuredClone(LOCKED_LECTERN_TRANSFORM),
-    book: {
-      position: toFixedArray(LOCKED_BOOK_TRANSFORM.position),
-      rotation: toFixedArray(LOCKED_BOOK_TRANSFORM.rotation),
-      scale: Number(LOCKED_BOOK_TRANSFORM.scale.toFixed(4)),
-    },
-    decal: {
-      position: toFixedArray(state.decal.position),
-      rotation: toFixedArray(state.decal.rotation),
-      scale: toFixedArray(state.decal.scale),
-      parent: currentCoverNode?.name || null,
-    },
+    decalParent: currentCoverNode?.name || null,
     cameraPresets: structuredClone(CAMERA_PRESETS),
     openClipTimeRatio: OPEN_CLIP_TIME_RATIO,
     animationProgress: Number(document.getElementById('animationProgress').value),
   };
   console.info('[BookLab] final transform values', payload);
   setStatus('Printed final transform values to console.');
+}
+
+function saveCurrentAsDefault() {
+  persistTransforms();
+  const configText = `const BOOK_LAB_FINAL_TRANSFORMS = ${JSON.stringify(getCurrentTransforms(), null, 2)};`;
+  console.info('[BookLab] copy-paste-ready config\n%s', configText);
+  setStatus('Saved current calibration in this browser and printed copy-paste-ready config to console.');
+}
+
+function resetToFinalApprovedValues() {
+  setStateFromTransforms(BOOK_LAB_FINAL_TRANSFORMS);
+  persistTransforms();
+  applyBookTransform();
+  syncInputs();
+  attachDecalToCover(state.coverTarget);
+  applyDecalTransform();
+  updatePageOverlay();
+  setStatus('Reset to final approved book-lab values and saved them for reloads.');
 }
 
 function updatePageOverlay() {
