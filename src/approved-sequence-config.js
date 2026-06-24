@@ -17,6 +17,7 @@ export const APPROVED_BOOK_TRANSFORMS = {
 
 export const APPROVED_SEQUENCE_CONFIG = {
   progress: 0,
+  book: APPROVED_BOOK_TRANSFORMS,
   camera: {
     presets: {
       gate_entry: {
@@ -68,6 +69,11 @@ export const APPROVED_SEQUENCE_CONFIG = {
     rotation: [0, 180, 0],
     scale: 1,
   },
+  lectern: {
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+    targetHeight: 2.05,
+  },
   church: {
     position: [0, -0.2, 0],
     rotation: [0, 0, 0],
@@ -82,6 +88,48 @@ export const APPROVED_SEQUENCE_CONFIG = {
       right: 8,
       near: -8,
       far: 6,
+    },
+  },
+  opening: {
+    clipTimeRatio: 0.5,
+    scrollStart: 0.82,
+    scrollEnd: 0.98,
+  },
+  lighting: {
+    toneMappingExposure: 1.05,
+    fog: {
+      color: '#090403',
+      desktopDensity: 0.038,
+      mobileDensity: 0.065,
+    },
+    hemisphere: {
+      skyColor: '#fff0cc',
+      groundColor: '#160604',
+      intensity: 1.15,
+    },
+    key: {
+      color: '#ffd18a',
+      intensity: 2.8,
+      position: [-3.2, 5.2, 4.6],
+    },
+    altarGlow: {
+      color: '#f3b45e',
+      intensity: 4.5,
+      finalIntensity: 4.6,
+      distance: 16,
+      angle: 0.5,
+      penumbra: 0.75,
+      decay: 1.2,
+      position: [2.4, 4.2, 2.6],
+      target: [0, 1.8, 0],
+    },
+  },
+  materials: {
+    defaultEnvMapIntensity: 0.72,
+    coverDecal: {
+      opacity: 0.96,
+      roughness: 0.38,
+      metalness: 0.36,
     },
   },
   overlays: {
@@ -99,4 +147,3 @@ export const APPROVED_SEQUENCE_CONFIG = {
     },
   },
 };
-

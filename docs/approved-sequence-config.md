@@ -6,6 +6,8 @@ The canonical source is:
 
 `src/approved-sequence-config.js`
 
+The public homepage imports `APPROVED_SEQUENCE_CONFIG` directly. It does not read Sequence Lab `localStorage`.
+
 ## LocalStorage Check
 
 Before locking the config, local browser/app storage was searched for:
@@ -77,3 +79,56 @@ book: {
 
 The cover decal remains attached to `cover-l_36` on the `back / underside` face.
 
+## Opening Timing
+
+```js
+opening: {
+  clipTimeRatio: 0.5,
+  scrollStart: 0.82,
+  scrollEnd: 0.98
+}
+```
+
+## Lighting / Rendering
+
+The homepage reads these values from `APPROVED_SEQUENCE_CONFIG.lighting`:
+
+```js
+lighting: {
+  toneMappingExposure: 1.05,
+  fog: {
+    color: '#090403',
+    desktopDensity: 0.038,
+    mobileDensity: 0.065
+  },
+  hemisphere: {
+    skyColor: '#fff0cc',
+    groundColor: '#160604',
+    intensity: 1.15
+  },
+  key: {
+    color: '#ffd18a',
+    intensity: 2.8,
+    position: [-3.2, 5.2, 4.6]
+  },
+  altarGlow: {
+    color: '#f3b45e',
+    intensity: 4.5,
+    finalIntensity: 4.6,
+    distance: 16,
+    angle: 0.5,
+    penumbra: 0.75,
+    decay: 1.2,
+    position: [2.4, 4.2, 2.6],
+    target: [0, 1.8, 0]
+  }
+}
+```
+
+## Sequence Lab Export Button
+
+`/sequence-lab` includes a visible button:
+
+`Copy approved config for homepage`
+
+It reads the current lab state, including any saved `localStorage` tuning, then copies a source-ready `APPROVED_SEQUENCE_CONFIG` export to the clipboard and prints it to the browser console.

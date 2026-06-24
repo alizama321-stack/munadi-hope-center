@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { APPROVED_BOOK_TRANSFORMS, APPROVED_SEQUENCE_CONFIG } from './approved-sequence-config.js';
+import { APPROVED_SEQUENCE_CONFIG } from './approved-sequence-config.js';
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const lowPowerViewport = window.matchMedia('(max-width: 720px)').matches;
@@ -12,13 +12,12 @@ const ASSETS = {
   church: '/public/assets/models/optimized/st_bartholomew-the-less_interior.glb',
 };
 
-const LECTERN_TRANSFORM = {
-  position: [0, 0, 0],
-  rotation: [0, 0, 0],
-  targetHeight: 2.05,
-};
+const LECTERN_TRANSFORM = APPROVED_SEQUENCE_CONFIG.lectern;
 
-const OPEN_CLIP_TIME_RATIO = 0.5;
+const APPROVED_BOOK_TRANSFORMS = APPROVED_SEQUENCE_CONFIG.book;
+const OPENING_CONFIG = APPROVED_SEQUENCE_CONFIG.opening;
+const LIGHTING_CONFIG = APPROVED_SEQUENCE_CONFIG.lighting;
+const MATERIAL_CONFIG = APPROVED_SEQUENCE_CONFIG.materials;
 const timeline = [
   { at: 0, key: 'gate_entry' },
   { at: 0.16, key: 'aisle_reveal' },
@@ -93,7 +92,7 @@ function cloneMaterial(material) {
   const next = material.clone();
   if (next.map) next.map.colorSpace = THREE.SRGBColorSpace;
   if (next.emissiveMap) next.emissiveMap.colorSpace = THREE.SRGBColorSpace;
-  if ('envMapIntensity' in next) next.envMapIntensity = 0.72;
+  if ('envMapIntensity' in next) next.envMapIntensity = MATERIAL_CONFIG.defaultEnvMapIntensity;
   next.needsUpdate = true;
   return next;
 }
@@ -358,29 +357,43 @@ async function setupScene() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lowPowerViewport ? 1.2 : 1.75));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.18;
+  renderer.toneMappingExposure = LIGHTING_CONFIG.toneMappingExposure;
   renderer.shadowMap.enabled = !lowPowerViewport;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.localClippingEnabled = true;
   renderer.clippingPlanes = getCropPlanes();
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#090403');
-  scene.fog = new THREE.FogExp2('#090403', lowPowerViewport ? 0.065 : APPROVED_SEQUENCE_CONFIG.environment.fog);
+  scene.background = new THREE.Color(LIGHTING_CONFIG.fog.color);
+  scene.fog = new THREE.FogExp2(
+    LIGHTING_CONFIG.fog.color,
+    lowPowerViewport ? LIGHTING_CONFIG.fog.mobileDensity : LIGHTING_CONFIG.fog.desktopDensity,
+  );
 
   const initial = getTimelineFrame(0);
   const camera = new THREE.PerspectiveCamera(initial.fov, 1, 0.1, 80);
   camera.position.copy(initial.position);
 
-  scene.add(new THREE.HemisphereLight('#fff2d0', '#1a0704', 1.35));
-  const key = new THREE.DirectionalLight('#ffe0a5', 2.2);
-  key.position.set(-3.8, 6.5, 5.2);
+  scene.add(new THREE.HemisphereLight(
+    LIGHTING_CONFIG.hemisphere.skyColor,
+    LIGHTING_CONFIG.hemisphere.groundColor,
+    LIGHTING_CONFIG.hemisphere.intensity,
+  ));
+  const key = new THREE.DirectionalLight(LIGHTING_CONFIG.key.color, LIGHTING_CONFIG.key.intensity);
+  key.position.fromArray(LIGHTING_CONFIG.key.position);
   key.castShadow = !lowPowerViewport;
   scene.add(key);
 
-  const altarGlow = new THREE.SpotLight('#ffc06f', 3.8, 18, 0.48, 0.78, 1.15);
-  altarGlow.position.set(2.2, 4.6, -1.8);
-  altarGlow.target.position.set(0, 2.1, -3.55);
+  const altarGlow = new THREE.SpotLight(
+    LIGHTING_CONFIG.altarGlow.color,
+    LIGHTING_CONFIG.altarGlow.intensity,
+    LIGHTING_CONFIG.altarGlow.distance,
+    LIGHTING_CONFIG.altarGlow.angle,
+    LIGHTING_CONFIG.altarGlow.penumbra,
+    LIGHTING_CONFIG.altarGlow.decay,
+  );
+  altarGlow.position.fromArray(LIGHTING_CONFIG.altarGlow.position);
+  altarGlow.target.position.fromArray(LIGHTING_CONFIG.altarGlow.target);
   altarGlow.castShadow = !lowPowerViewport;
   scene.add(altarGlow, altarGlow.target);
 
@@ -425,9 +438,9 @@ async function setupScene() {
       new THREE.MeshStandardMaterial({
         map: createCoverTexture(),
         transparent: true,
-        opacity: 0.96,
-        roughness: 0.38,
-        metalness: 0.36,
+        opacity: MATERIAL_CONFIG.coverDecal.opacity,
+        roughness: MATERIAL_CONFIG.coverDecal.roughness,
+        metalness: MATERIAL_CONFIG.coverDecal.metalness,
         depthTest: false,
         depthWrite: false,
         side: THREE.DoubleSide,
@@ -462,13 +475,17 @@ async function setupScene() {
       camera.lookAt(frame.target);
       camera.updateProjectionMatrix();
 
-      const openProgress = reducedMotion ? 1 : smoothstep(0.82, 0.98, progress);
+      const openProgress = reducedMotion ? 1 : smoothstep(OPENING_CONFIG.scrollStart, OPENING_CONFIG.scrollEnd, progress);
       if (action && clip) {
-        mixer.setTime(openProgress * clip.duration * OPEN_CLIP_TIME_RATIO);
+        mixer.setTime(openProgress * clip.duration * OPENING_CONFIG.clipTimeRatio);
         mixer.update(0);
       }
 
-      altarGlow.intensity = mix(2.6, 4.6, smoothstep(0.72, 1, progress));
+      altarGlow.intensity = mix(
+        LIGHTING_CONFIG.altarGlow.intensity,
+        LIGHTING_CONFIG.altarGlow.finalIntensity,
+        smoothstep(0.72, 1, progress),
+      );
       updateHeroOverlay(progress);
       updatePageOverlay(progress, camera, bookRig);
     }

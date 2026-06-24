@@ -15,11 +15,7 @@ const DEBUG_MODE = new URLSearchParams(window.location.search).get('debug') === 
 const BOOK_LAB_STORAGE_KEY = 'munadiHopeCenter.bookLab.transforms';
 const BOOK_LAB_SEQUENCE_STORAGE_KEY = 'munadiHopeCenter.sequenceLab.v2.sequence';
 
-const LOCKED_LECTERN_TRANSFORM = {
-  position: [0, 0, 0],
-  rotation: [0, 0, 0],
-  targetHeight: 2.05,
-};
+const LOCKED_LECTERN_TRANSFORM = APPROVED_SEQUENCE_CONFIG.lectern;
 
 const BOOK_LAB_FINAL_TRANSFORMS = APPROVED_BOOK_TRANSFORMS;
 
@@ -1093,6 +1089,7 @@ function setupControls() {
   document.getElementById('printValues').addEventListener('click', printValues);
   document.getElementById('resetDefaults').addEventListener('click', resetToFinalApprovedValues);
   document.getElementById('saveAisleReveal').addEventListener('click', saveCurrentCameraAsAisleReveal);
+  document.getElementById('copyHomepageConfig').addEventListener('click', copyApprovedConfigForHomepage);
   document.getElementById('exportApprovedConfig').addEventListener('click', exportApprovedConfig);
   document.getElementById('applyApprovedConfig').addEventListener('click', applyApprovedConfig);
   document.getElementById('printSequence').addEventListener('click', printSequenceConfig);
@@ -1150,6 +1147,68 @@ function printSequenceConfig() {
   const configText = `const SEQUENCE_LAB_DEFAULT_SEQUENCE = ${JSON.stringify(getSequenceConfigForExport(), null, 2)};`;
   console.info('[SequenceLab] final sequence config\n%s', configText);
   setStatus('Printed final sequence config to console.');
+}
+
+function getApprovedHomepageConfigFromLabState() {
+  return {
+    ...getSequenceConfigForExport(),
+    book: getCurrentTransforms(),
+    opening: {
+      clipTimeRatio: OPEN_CLIP_TIME_RATIO,
+      scrollStart: 0.82,
+      scrollEnd: 0.98,
+    },
+    lighting: {
+      toneMappingExposure: renderer.toneMappingExposure,
+      fog: {
+        color: '#090403',
+        desktopDensity: Number(sequenceState.environment.fog.toFixed(4)),
+        mobileDensity: 0.065,
+      },
+      hemisphere: {
+        skyColor: '#fff0cc',
+        groundColor: '#160604',
+        intensity: 1.15,
+      },
+      key: {
+        color: '#ffd18a',
+        intensity: Number(keyLight.intensity.toFixed(4)),
+        position: toFixedArray(keyLight.position.toArray()),
+      },
+      altarGlow: {
+        color: '#f3b45e',
+        intensity: Number(glow.intensity.toFixed(4)),
+        finalIntensity: 4.6,
+        distance: glow.distance,
+        angle: Number(glow.angle.toFixed(4)),
+        penumbra: Number(glow.penumbra.toFixed(4)),
+        decay: Number(glow.decay.toFixed(4)),
+        position: toFixedArray(glow.position.toArray()),
+        target: toFixedArray(glow.target.position.toArray()),
+      },
+    },
+    materials: {
+      defaultEnvMapIntensity: 0.72,
+      coverDecal: {
+        opacity: 0.96,
+        roughness: 0.38,
+        metalness: 0.36,
+      },
+    },
+  };
+}
+
+async function copyApprovedConfigForHomepage() {
+  const config = getApprovedHomepageConfigFromLabState();
+  const configText = `export const APPROVED_SEQUENCE_CONFIG = ${JSON.stringify(config, null, 2)};`;
+  console.info('[SequenceLab] Copy approved config for homepage\n%s', configText);
+  try {
+    await navigator.clipboard.writeText(configText);
+    setStatus('Copied approved homepage config to clipboard and printed it to console.');
+  } catch (error) {
+    console.warn('[SequenceLab] Clipboard copy failed; config was printed to console.', error);
+    setStatus('Clipboard blocked. Approved homepage config was printed to console.');
+  }
 }
 
 function exportApprovedConfig() {
