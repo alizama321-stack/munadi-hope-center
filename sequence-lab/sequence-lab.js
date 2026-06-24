@@ -9,6 +9,8 @@ const ASSETS = {
   church: '/public/assets/models/optimized/st_bartholomew-the-less_interior.glb',
 };
 
+const DEBUG_MODE = new URLSearchParams(window.location.search).get('debug') === '1';
+
 const BOOK_LAB_STORAGE_KEY = 'munadiHopeCenter.bookLab.transforms';
 const BOOK_LAB_SEQUENCE_STORAGE_KEY = 'munadiHopeCenter.sequenceLab.sequence';
 
@@ -370,18 +372,12 @@ glow.position.set(2.4, 4.2, 2.6);
 glow.target.position.set(0, 1.8, 0);
 scene.add(glow, glow.target);
 
-const floor = new THREE.Mesh(
-  new THREE.CircleGeometry(4.4, 96),
-  new THREE.MeshStandardMaterial({ color: '#261007', roughness: 0.92 }),
-);
-floor.rotation.x = -Math.PI / 2;
-floor.receiveShadow = true;
-scene.add(floor);
-
 const surfaceHelper = new THREE.GridHelper(1.38, 8, '#f1d27a', '#6a3916');
+surfaceHelper.name = 'DebugLecternSurfaceHelper';
 surfaceHelper.position.set(0, 2.025, 0.03);
 surfaceHelper.material.transparent = true;
 surfaceHelper.material.opacity = 0.48;
+surfaceHelper.visible = DEBUG_MODE;
 
 let churchRoot = null;
 
