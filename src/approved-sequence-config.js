@@ -1,0 +1,102 @@
+export const APPROVED_BOOK_TRANSFORMS = {
+  cover: {
+    target: 'cover-l_36',
+    face: 1,
+  },
+  book: {
+    position: [-0.33, 2.02, -0.12],
+    rotation: [18, 0, 360],
+    scale: 0.26,
+  },
+  decal: {
+    position: [0, 0, 0],
+    rotation: [0, 0, 180],
+    scale: [1.36, 1.35],
+  },
+};
+
+export const APPROVED_SEQUENCE_CONFIG = {
+  progress: 0,
+  camera: {
+    presets: {
+      gate_entry: {
+        position: [0, 1.95, 7.25],
+        target: [0, 2.1, 2.8],
+        fov: 50,
+        distance: 1,
+      },
+      aisle_reveal: {
+        position: [0, 1.85, 4.65],
+        target: [0, 2.55, -3],
+        fov: 62,
+        distance: 1,
+      },
+      aisle_walk_mid: {
+        position: [0, 1.88, 2.05],
+        target: [0, 2.35, -3.25],
+        fov: 48,
+        distance: 1,
+      },
+      altar_approach: {
+        position: [0, 2.02, -0.75],
+        target: [0, 2.18, -3.5],
+        fov: 36,
+        distance: 1,
+      },
+      lectern_end_point: {
+        position: [0, 2.18, -2],
+        target: [0, 2.16, -3.55],
+        fov: 30,
+        distance: 1,
+      },
+      bible_closeup: {
+        position: [-0.12, 3.08, -3.04],
+        target: [0, 2.26, -3.55],
+        fov: 22,
+        distance: 1,
+      },
+      bible_open_pages: {
+        position: [0, 3.18, -3.5],
+        target: [0, 2.18, -3.55],
+        fov: 24,
+        distance: 1,
+      },
+    },
+  },
+  altar: {
+    position: [0, 0, -3.55],
+    rotation: [0, 180, 0],
+    scale: 1,
+  },
+  church: {
+    position: [0, -0.2, 0],
+    rotation: [0, 0, 0],
+    scale: 0.82,
+    visible: true,
+  },
+  environment: {
+    fog: 0.038,
+    darkness: 0.42,
+    crop: {
+      left: -8,
+      right: 8,
+      near: -8,
+      far: 6,
+    },
+  },
+  overlays: {
+    opacity: 0.86,
+    borderVisible: true,
+    left: {
+      position: [-0.92, -0.46, -0.08],
+      rotation: [0, 0, 0],
+      scale: [1.18, 0.84],
+    },
+    right: {
+      position: [0.55, -0.46, -0.03],
+      rotation: [0, 0, 0],
+      scale: [1.2, 0.84],
+    },
+  },
+};
+

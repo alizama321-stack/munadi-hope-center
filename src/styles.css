@@ -394,14 +394,6 @@ main,
   color: var(--cream);
 }
 
-.debug-only {
-  display: none;
-}
-
-.debug-scene .debug-only {
-  display: inline-flex;
-}
-
 .timeline-label {
   position: absolute;
   right: clamp(1.25rem, 5vw, 3rem);
@@ -415,31 +407,19 @@ main,
   text-transform: uppercase;
 }
 
-.debug-scene .timeline-label {
-  display: block;
-  color: var(--gold-light);
-  background: rgba(22, 7, 4, 0.72);
-  border: 1px solid rgba(240, 201, 117, 0.35);
-  border-radius: var(--radius);
-  padding: 0.6rem 0.7rem;
-}
-
 .page-content-overlay {
   position: fixed;
   z-index: 4;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: clamp(0.18rem, 0.6vw, 0.42rem);
-  width: min(760px, calc(100vw - 2rem));
-  left: 50%;
-  top: 50%;
-  transform: translate3d(-50%, -50%, 0) rotate(var(--page-tilt, 0deg));
-  opacity: var(--page-overlay-opacity, 0);
+  inset: 0;
   pointer-events: none;
-  transition: opacity 0.2s linear;
 }
 
 .bible-page-test {
+  position: fixed;
+  left: var(--safe-left, 50%);
+  top: var(--safe-top, 50%);
+  width: var(--safe-width, 280px);
+  height: var(--safe-height, 180px);
   min-height: clamp(140px, 16vw, 220px);
   padding: clamp(0.85rem, 1.5vw, 1.25rem);
   border-radius: 2px;
@@ -451,6 +431,11 @@ main,
   text-shadow:
     0 1px 0 rgba(255, 248, 226, 0.92),
     0 0 14px rgba(255, 241, 201, 0.55);
+  opacity: var(--page-overlay-opacity, 0);
+  transform: translate3d(-50%, -50%, 0) rotate(var(--safe-rotation, 0rad));
+  transform-origin: center;
+  overflow: hidden;
+  transition: opacity 0.2s linear;
 }
 
 .bible-page-test .eyebrow {
@@ -468,95 +453,6 @@ main,
   color: rgba(41, 23, 14, 0.98);
   font-size: clamp(0.84rem, 1.4vw, 1rem);
   line-height: 1.56;
-}
-
-.debug-label {
-  position: fixed;
-  z-index: 60;
-  display: none;
-  padding: 0.28rem 0.42rem;
-  border: 1px solid rgba(240, 201, 117, 0.56);
-  border-radius: 4px;
-  background: rgba(22, 7, 4, 0.74);
-  color: var(--gold-light);
-  font-size: 0.58rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  pointer-events: none;
-  transform: translate3d(-50%, -50%, 0);
-  white-space: nowrap;
-}
-
-.debug-scene .debug-label {
-  display: block;
-}
-
-.calibration-panel {
-  position: fixed;
-  left: 1rem;
-  top: 5.4rem;
-  z-index: 80;
-  display: none;
-  width: min(260px, calc(100vw - 2rem));
-  max-height: calc(100vh - 7rem);
-  overflow: auto;
-  padding: 0.85rem;
-  border: 1px solid rgba(240, 201, 117, 0.42);
-  border-radius: var(--radius);
-  background: rgba(18, 5, 3, 0.86);
-  color: var(--cream);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.42);
-  backdrop-filter: blur(14px);
-}
-
-.debug-scene .calibration-panel {
-  display: grid;
-  gap: 0.46rem;
-}
-
-.calibration-panel strong {
-  margin-bottom: 0.25rem;
-  color: var(--gold-light);
-  font-family: "Cormorant Garamond", serif;
-  font-size: 1.1rem;
-}
-
-.calibration-panel label {
-  display: grid;
-  grid-template-columns: 6.4rem 1fr;
-  align-items: center;
-  gap: 0.5rem;
-  color: rgba(255, 248, 233, 0.78);
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-.calibration-panel input {
-  width: 100%;
-  min-height: 30px;
-  border: 1px solid rgba(240, 201, 117, 0.32);
-  border-radius: 4px;
-  background: rgba(255, 248, 233, 0.08);
-  color: var(--cream);
-  padding: 0.25rem 0.35rem;
-}
-
-.calibration-panel button {
-  min-height: 34px;
-  margin-top: 0.2rem;
-  border: 1px solid rgba(240, 201, 117, 0.5);
-  border-radius: 4px;
-  background: rgba(240, 201, 117, 0.16);
-  color: var(--gold-light);
-  cursor: pointer;
-  font-weight: 800;
-}
-
-.calibration-panel small {
-  color: rgba(255, 248, 233, 0.56);
-  font-size: 0.68rem;
-  line-height: 1.45;
 }
 
 .site-footer {
@@ -633,7 +529,7 @@ main,
   }
 
   .page-content-overlay {
-    width: min(680px, calc(100vw - 2rem));
+    inset: 0;
   }
 }
 
@@ -686,14 +582,19 @@ main,
   }
 
   .page-content-overlay {
-    grid-template-columns: 1fr;
-    width: min(360px, calc(100vw - 1.5rem));
-    gap: 0.65rem;
+    inset: 0;
   }
 
   .bible-page-test {
+    position: relative;
+    left: auto;
+    top: auto;
+    width: min(360px, calc(100vw - 1.5rem));
+    height: auto;
+    margin: 0.65rem auto;
     min-height: auto;
     padding: 0.9rem;
+    transform: none;
   }
 }
 

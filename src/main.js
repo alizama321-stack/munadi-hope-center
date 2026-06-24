@@ -1,65 +1,32 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { APPROVED_BOOK_TRANSFORMS, APPROVED_SEQUENCE_CONFIG } from './approved-sequence-config.js';
 
-const MODEL_ROOT = '/public/assets/models/optimized/';
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const lowPowerViewport = window.matchMedia('(max-width: 720px)').matches;
-const debugMode = new URLSearchParams(window.location.search).has('debug');
 
 const ASSETS = {
-  door: `${MODEL_ROOT}wooden_church_door.glb`,
-  interior: `${MODEL_ROOT}st_bartholomew-the-less_interior.glb`,
-  lectern: `${MODEL_ROOT}lectern.glb`,
-  closedBible: `${MODEL_ROOT}biblia.glb`,
-  openBible: `${MODEL_ROOT}open_bible.glb`,
+  book: '/public/assets/models/book_animated_book__historical_book.glb',
+  lectern: '/public/assets/models/optimized/lectern.glb',
+  church: '/public/assets/models/optimized/st_bartholomew-the-less_interior.glb',
 };
 
-const BIBLE_TARGET_FOOTPRINT = 0.82;
-
-// Scene transform constants for Phase 2 tuning.
-const SCENE_TUNING = {
-  // The church interior's longest model axis is local X; rotate it so that axis becomes the world Z nave path.
-  interiorPosition: [0, 0, 0],
-  interiorRotation: [0, -Math.PI / 2, 0],
-  interiorHeight: 5.2,
-  doorPosition: [0, 0, 8.6],
-  doorRotation: [0, 0, 0],
-  doorHeight: 4.65,
-  lecternPosition: [0, 0, -6.45],
-  lecternRotation: [0, 0, 0],
-  lecternScale: 1.28,
-  lecternSurfacePosition: [0, 1.76, 0.08],
-  lecternSurfaceRotation: [0, 0, 0],
-  lecternSurfaceSize: [1.34, 0.92],
-  bibleRigPosition: [0, 0.018, 0],
-  bibleRigRotation: [0, 0, 0],
-  bibleRigScale: 0.92,
-  closedBibleLocalRotation: [0, 0, 0],
-  closedBibleLocalOffset: [0, 0, 0],
-  closedBibleScale: 1,
-  openBibleLocalRotation: [0, 0, 0],
-  openBibleLocalOffset: [0, 0, 0],
-  openBibleScale: 1,
+const LECTERN_TRANSFORM = {
+  position: [0, 0, 0],
+  rotation: [0, 0, 0],
+  targetHeight: 2.05,
 };
 
-const cameraWaypoints = [
-  // entrance_pov: visitor POV outside the main wooden entrance.
-  { name: 'entrance_pov', at: 0, camera: [0, 1.58, 11.8], target: [0, 1.48, 8.55] },
-  // aisle_start: camera crosses the threshold and aligns with the center aisle.
-  { name: 'aisle_start', at: 0.14, camera: [0, 1.58, 6.9], target: [0, 1.42, 1.4] },
-  // aisle_mid: camera travels straight down the central nave/hallway.
-  { name: 'aisle_mid', at: 0.32, camera: [0, 1.58, 1.9], target: [0, 1.34, -3.85] },
-  // stage_approach: camera approaches the front/stage without cutting scenes.
-  { name: 'stage_approach', at: 0.5, camera: [0, 1.64, -2.85], target: [0, 1.44, -6.45] },
-  // lectern_stage: lectern is already placed on the front/stage and remains visible.
-  { name: 'lectern_stage', at: 0.64, camera: [-2.24, 1.76, -4.35], target: [0, 1.66, -6.45] },
-  // bible_cover_topdown: top-down view of the closed Bible cover on the lectern.
-  { name: 'bible_cover_topdown', at: 0.82, camera: [-0.14, 3.95, -6.18], target: [0, 1.94, -6.42] },
-  // bible_open_on_lectern: same lectern location, open model replaces closed model.
-  { name: 'bible_open_on_lectern', at: 0.91, camera: [0, 4.2, -6.42], target: [0, 1.92, -6.45] },
-  // bible_pages_content: HTML page overlays attach to the open spread.
-  { name: 'bible_pages_content', at: 1, camera: [0, 4.35, -6.5], target: [0, 1.92, -6.45] },
+const OPEN_CLIP_TIME_RATIO = 0.5;
+const timeline = [
+  { at: 0, key: 'gate_entry' },
+  { at: 0.16, key: 'aisle_reveal' },
+  { at: 0.38, key: 'aisle_walk_mid' },
+  { at: 0.58, key: 'altar_approach' },
+  { at: 0.72, key: 'lectern_end_point' },
+  { at: 0.86, key: 'bible_closeup' },
+  { at: 1, key: 'bible_open_pages' },
 ];
 
 function clamp(value, min = 0, max = 1) {
@@ -67,40 +34,51 @@ function clamp(value, min = 0, max = 1) {
 }
 
 function smoothstep(edge0, edge1, value) {
-  const x = clamp((value - edge0) / (edge1 - edge0));
-  return x * x * (3 - 2 * x);
+  const t = clamp((value - edge0) / Math.max(0.0001, edge1 - edge0));
+  return t * t * (3 - 2 * t);
 }
 
 function mix(a, b, t) {
   return a + (b - a) * t;
 }
 
-function mixVec3(a, b, t) {
-  return new THREE.Vector3(mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t));
+function degToRad(value) {
+  return THREE.MathUtils.degToRad(value);
 }
 
-function toEuler(values) {
-  return new THREE.Euler(values[0], values[1], values[2]);
+function toVec3(values) {
+  return new THREE.Vector3().fromArray(values);
 }
 
-function getTimelinePoint(progress) {
-  const p = reducedMotion ? 0.82 : clamp(progress);
-  let start = cameraWaypoints[0];
-  let end = cameraWaypoints[cameraWaypoints.length - 1];
+function getCameraFrame(key) {
+  const preset = APPROVED_SEQUENCE_CONFIG.camera.presets[key];
+  const target = toVec3(preset.target);
+  const basePosition = toVec3(preset.position);
+  const position = target.clone().add(basePosition.sub(target).multiplyScalar(preset.distance));
+  return { position, target, fov: preset.fov };
+}
 
-  for (let i = 0; i < cameraWaypoints.length - 1; i += 1) {
-    if (p >= cameraWaypoints[i].at && p <= cameraWaypoints[i + 1].at) {
-      start = cameraWaypoints[i];
-      end = cameraWaypoints[i + 1];
+function getTimelineFrame(progress) {
+  const p = reducedMotion ? 1 : clamp(progress);
+  let start = timeline[0];
+  let end = timeline[timeline.length - 1];
+
+  for (let i = 0; i < timeline.length - 1; i += 1) {
+    if (p >= timeline[i].at && p <= timeline[i + 1].at) {
+      start = timeline[i];
+      end = timeline[i + 1];
       break;
     }
   }
 
   const local = smoothstep(start.at, end.at, p);
+  const a = getCameraFrame(start.key);
+  const b = getCameraFrame(end.key);
   return {
-    name: local < 0.5 ? start.name : end.name,
-    camera: mixVec3(start.camera, end.camera, local),
-    target: mixVec3(start.target, end.target, local),
+    key: local < 0.5 ? start.key : end.key,
+    position: a.position.lerp(b.position, local),
+    target: a.target.lerp(b.target, local),
+    fov: mix(a.fov, b.fov, local),
   };
 }
 
@@ -109,6 +87,28 @@ function setStatus(message, state = '') {
   if (!status) return;
   status.textContent = message;
   status.dataset.state = state;
+}
+
+function cloneMaterial(material) {
+  const next = material.clone();
+  if (next.map) next.map.colorSpace = THREE.SRGBColorSpace;
+  if (next.emissiveMap) next.emissiveMap.colorSpace = THREE.SRGBColorSpace;
+  if ('envMapIntensity' in next) next.envMapIntensity = 0.72;
+  next.needsUpdate = true;
+  return next;
+}
+
+function preserveModelMaterials(object) {
+  object.traverse((child) => {
+    if (!child.isMesh) return;
+    child.castShadow = !lowPowerViewport;
+    child.receiveShadow = true;
+    if (Array.isArray(child.material)) {
+      child.material = child.material.map(cloneMaterial);
+    } else if (child.material) {
+      child.material = cloneMaterial(child.material);
+    }
+  });
 }
 
 function setOpacity(object, opacity) {
@@ -120,606 +120,229 @@ function setOpacity(object, opacity) {
       material.transparent = opacity < 0.999;
       material.opacity = opacity;
       material.depthWrite = opacity > 0.98;
-    });
-  });
-}
-
-function tuneMaterials(object, options = {}) {
-  object.traverse((child) => {
-    if (!child.isMesh) return;
-    child.castShadow = true;
-    child.receiveShadow = true;
-    const materials = Array.isArray(child.material) ? child.material : [child.material];
-    materials.forEach((material) => {
-      if (!material) return;
-      material.envMapIntensity = options.envMapIntensity ?? 0.7;
-      if ('roughness' in material) material.roughness = Math.max(material.roughness ?? 0.65, options.roughness ?? 0.72);
-      if ('metalness' in material && options.metalness !== undefined) material.metalness = options.metalness;
-      if (options.opacity !== undefined) {
-        material.transparent = true;
-        material.opacity = options.opacity;
-      }
-      if (options.clippingPlanes) {
-        material.clippingPlanes = options.clippingPlanes;
-        material.clipIntersection = true;
-      }
       material.needsUpdate = true;
     });
   });
 }
 
-function normalizeToGround(object) {
-  const box = new THREE.Box3().setFromObject(object);
-  const center = box.getCenter(new THREE.Vector3());
-  object.position.x -= center.x;
-  object.position.z -= center.z;
-  object.position.y -= box.min.y;
-  return object;
-}
-
-function normalizeToHeight(object, targetHeight) {
+function normalizeToGround(object, targetHeight) {
   const box = new THREE.Box3().setFromObject(object);
   const size = box.getSize(new THREE.Vector3());
   object.scale.setScalar(targetHeight / Math.max(0.001, size.y));
-  return normalizeToGround(object);
-}
-
-function normalizeFootprint(object, targetWidth) {
-  const box = new THREE.Box3().setFromObject(object);
-  const size = box.getSize(new THREE.Vector3());
-  object.scale.setScalar(targetWidth / Math.max(0.001, size.x));
-  return normalizeToGround(object);
-}
-
-function eulerToArray(euler) {
-  return [euler.x, euler.y, euler.z].map((value) => Number(value.toFixed(4)));
-}
-
-function measureObject(object) {
   object.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(object);
-  const size = box.getSize(new THREE.Vector3());
-  const center = box.getCenter(new THREE.Vector3());
-  return { box, size, center };
+  const nextBox = new THREE.Box3().setFromObject(object);
+  const center = nextBox.getCenter(new THREE.Vector3());
+  object.position.x -= center.x;
+  object.position.z -= center.z;
+  object.position.y -= nextBox.min.y;
 }
 
-function findFlatBibleOrientation(model, label) {
-  const turns = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
-  let best = null;
+function createCoverTexture() {
+  const width = 1024;
+  const height = 1400;
+  const canvasTexture = document.createElement('canvas');
+  canvasTexture.width = width;
+  canvasTexture.height = height;
+  const ctx = canvasTexture.getContext('2d');
+  ctx.clearRect(0, 0, width, height);
 
-  turns.forEach((x) => {
-    turns.forEach((y) => {
-      turns.forEach((z) => {
-        const probe = model.clone(true);
-        probe.rotation.set(x, y, z);
-        const { size } = measureObject(probe);
-        const largest = Math.max(size.x, size.y, size.z, 0.001);
-        const smallest = Math.min(size.x, size.y, size.z);
-        const yShouldBeThickness = Math.abs(size.y - smallest) / largest;
-        const lengthShouldBeZ = size.z >= size.x ? 0 : (size.x - size.z) / largest;
-        const score = yShouldBeThickness * 8 + lengthShouldBeZ;
-        const candidate = { rotation: new THREE.Euler(x, y, z), size, score };
-        if (!best || candidate.score < best.score) best = candidate;
-      });
-    });
-  });
+  const gold = '#f1c85f';
+  const darkGold = '#8b5e17';
+  ctx.save();
+  ctx.globalAlpha = 0.96;
+  ctx.strokeStyle = gold;
+  ctx.lineWidth = 10;
+  ctx.shadowColor = 'rgba(40, 20, 2, 0.72)';
+  ctx.shadowBlur = 9;
+  ctx.strokeRect(92, 94, width - 184, height - 188);
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = darkGold;
+  ctx.strokeRect(122, 124, width - 244, height - 248);
 
-  console.info(`[BibleRig] ${label} bounding-box orientation`, {
-    rotation: eulerToArray(best.rotation),
-    size: [best.size.x, best.size.y, best.size.z].map((value) => Number(value.toFixed(4))),
-    score: Number(best.score.toFixed(4)),
-  });
-
-  return best.rotation;
-}
-
-function normalizeBibleModel(rawModel, label, config) {
-  const model = rawModel;
-  const autoRotation = findFlatBibleOrientation(model, label);
-  const root = new THREE.Group();
-  root.name = `${label}NormalizedRoot`;
-  const localRotation = toEuler(config.localRotation);
-
-  model.position.set(0, 0, 0);
-  model.rotation.copy(autoRotation);
-  model.scale.setScalar(1);
-  const rotatedSize = measureObject(model).size;
-  const footprintScale = BIBLE_TARGET_FOOTPRINT / Math.max(rotatedSize.x, rotatedSize.z, 0.001);
-  model.scale.setScalar(footprintScale);
-
-  const { box, size, center } = measureObject(model);
-  model.position.x += -center.x;
-  model.position.y += -box.min.y;
-  model.position.z += -center.z;
-
-  root.position.fromArray(config.localOffset);
-  root.rotation.copy(localRotation);
-  root.scale.setScalar(config.scale);
-  root.add(model);
-  measureObject(root);
-
-  console.info(`[BibleRig] ${label} normalized bounds`, {
-    autoRotation: eulerToArray(autoRotation),
-    localRotation: config.localRotation,
-    localOffset: config.localOffset,
-    localScale: config.scale,
-    footprintScale: Number(footprintScale.toFixed(4)),
-    sourceSize: [size.x, size.y, size.z].map((value) => Number(value.toFixed(4))),
-  });
-
-  tuneMaterials(model, { envMapIntensity: config.envMapIntensity, roughness: config.roughness });
-  return root;
-}
-
-function createLecternSurfaceHelper(size) {
-  const helper = new THREE.Group();
-  helper.name = 'LecternSurfaceHelper';
-  helper.visible = debugMode;
-
-  const [width, depth] = size;
-  const grid = new THREE.GridHelper(1, 8, '#f0c975', '#7f4a22');
-  grid.scale.set(width, 1, depth);
-  grid.material.transparent = true;
-  grid.material.opacity = 0.58;
-  helper.add(grid);
-
-  const outlineGeometry = new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(-width / 2, 0.006, -depth / 2),
-    new THREE.Vector3(width / 2, 0.006, -depth / 2),
-    new THREE.Vector3(width / 2, 0.006, depth / 2),
-    new THREE.Vector3(-width / 2, 0.006, depth / 2),
-    new THREE.Vector3(-width / 2, 0.006, -depth / 2),
-  ]);
-  const outline = new THREE.Line(
-    outlineGeometry,
-    new THREE.LineBasicMaterial({ color: '#f0c975', transparent: true, opacity: 0.88 }),
-  );
-  helper.add(outline);
-
-  return helper;
-}
-
-function createOpeningRig() {
-  const group = new THREE.Group();
-  group.name = 'ProceduralOpeningRig';
-
-  const coverMaterial = new THREE.MeshStandardMaterial({
-    color: '#160b08',
-    roughness: 0.84,
-    metalness: 0.04,
-    side: THREE.DoubleSide,
-  });
-  const pageMaterial = new THREE.MeshStandardMaterial({
-    color: '#f1dfb7',
-    roughness: 0.9,
-    side: THREE.DoubleSide,
-    transparent: true,
-    opacity: 0.9,
-  });
-  const goldMaterial = new THREE.MeshStandardMaterial({
-    color: '#c9952e',
-    roughness: 0.48,
-    metalness: 0.5,
-    side: THREE.DoubleSide,
-  });
-
-  const base = new THREE.Mesh(new THREE.BoxGeometry(1.08, 0.055, 0.72), pageMaterial);
-  base.position.y = 0.03;
-  base.castShadow = true;
-  base.receiveShadow = true;
-  group.add(base);
-
-  const backCover = new THREE.Mesh(new THREE.BoxGeometry(1.12, 0.03, 0.76), coverMaterial);
-  backCover.position.y = 0.014;
-  backCover.castShadow = true;
-  backCover.receiveShadow = true;
-  group.add(backCover);
-
-  const coverHinge = new THREE.Group();
-  coverHinge.name = 'OpeningCoverHinge';
-  coverHinge.position.set(-0.56, 0.075, 0);
-  const frontCover = new THREE.Mesh(new THREE.BoxGeometry(1.12, 0.028, 0.76), coverMaterial);
-  frontCover.position.x = 0.56;
-  frontCover.castShadow = true;
-  frontCover.receiveShadow = true;
-  coverHinge.add(frontCover);
-  const goldLine = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.006, 0.012), goldMaterial);
-  goldLine.position.set(0.56, 0.02, -0.28);
-  coverHinge.add(goldLine);
-  group.add(coverHinge);
-
-  const pageHinges = [];
-  for (let i = 0; i < 5; i += 1) {
-    const hinge = new THREE.Group();
-    hinge.name = `OpeningPageHinge_${i + 1}`;
-    hinge.position.set(-0.52, 0.087 + i * 0.004, 0);
-    const page = new THREE.Mesh(new THREE.PlaneGeometry(1.02 - i * 0.025, 0.68), pageMaterial.clone());
-    page.rotation.x = -Math.PI / 2;
-    page.position.x = 0.51 - i * 0.012;
-    page.castShadow = true;
-    page.receiveShadow = true;
-    hinge.add(page);
-    pageHinges.push(hinge);
-    group.add(hinge);
-  }
-
-  group.userData.updateOpening = (progress) => {
-    const p = smoothstep(0, 1, progress);
-    coverHinge.rotation.z = -p * 2.35;
-    pageHinges.forEach((hinge, index) => {
-      const delay = index * 0.08;
-      const pageProgress = smoothstep(delay, 1, p);
-      hinge.rotation.z = -pageProgress * (1.25 + index * 0.16);
-      hinge.rotation.x = Math.sin(p * Math.PI + index) * 0.018;
-    });
+  const drawCorner = (x, y, sx, sy) => {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(sx, sy);
+    ctx.lineWidth = 9;
+    ctx.strokeStyle = gold;
+    ctx.beginPath();
+    ctx.moveTo(0, 72);
+    ctx.quadraticCurveTo(0, 16, 56, 16);
+    ctx.moveTo(18, 92);
+    ctx.quadraticCurveTo(24, 38, 82, 36);
+    ctx.stroke();
+    ctx.restore();
   };
+  drawCorner(92, 94, 1, 1);
+  drawCorner(width - 92, 94, -1, 1);
+  drawCorner(92, height - 94, 1, -1);
+  drawCorner(width - 92, height - 94, -1, -1);
 
-  return group;
+  const cx = width / 2;
+  const cross = new Path2D();
+  cross.rect(cx - 32, 335, 64, 240);
+  cross.rect(cx - 89, 411, 178, 58);
+  ctx.fillStyle = gold;
+  ctx.strokeStyle = '#5c3b0b';
+  ctx.lineWidth = 8;
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.68)';
+  ctx.shadowBlur = 16;
+  ctx.stroke(cross);
+  ctx.fill(cross);
+
+  ctx.font = '700 86px "Cormorant Garamond", Georgia, serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = 'rgba(52, 27, 4, 0.72)';
+  ctx.fillStyle = gold;
+  ctx.strokeText('Munadi Hope', cx, 700);
+  ctx.fillText('Munadi Hope', cx, 700);
+  ctx.strokeText('Center', cx, 792);
+  ctx.fillText('Center', cx, 792);
+  ctx.restore();
+
+  const texture = new THREE.CanvasTexture(canvasTexture);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  texture.needsUpdate = true;
+  return texture;
 }
 
-function createPageAnchorGroup() {
-  const group = new THREE.Group();
-  group.name = 'BiblePageAnchor';
-  group.position.set(0, 0.11, 0);
-  return group;
-}
-
-function applyRigTransform(group, values) {
-  group.position.fromArray(values.position);
-  group.rotation.copy(toEuler(values.rotation));
-  group.scale.setScalar(values.scale);
-}
-
-function createCalibrationPanel({ lecternSurface, bibleRig, closedModel, openModel }) {
-  if (!debugMode) return;
-
-  const panel = document.createElement('div');
-  panel.className = 'calibration-panel debug-only';
-  panel.innerHTML = `
-    <strong>BibleRig calibration</strong>
-    <label>surface X <input data-bind="surface.position.x" type="number" step="0.01"></label>
-    <label>surface Y <input data-bind="surface.position.y" type="number" step="0.01"></label>
-    <label>surface Z <input data-bind="surface.position.z" type="number" step="0.01"></label>
-    <label>rig X <input data-bind="rig.position.x" type="number" step="0.01"></label>
-    <label>rig Y <input data-bind="rig.position.y" type="number" step="0.005"></label>
-    <label>rig Z <input data-bind="rig.position.z" type="number" step="0.01"></label>
-    <label>rig rot X <input data-bind="rig.rotation.x" type="number" step="1"></label>
-    <label>rig rot Y <input data-bind="rig.rotation.y" type="number" step="1"></label>
-    <label>rig rot Z <input data-bind="rig.rotation.z" type="number" step="1"></label>
-    <label>rig scale <input data-bind="rig.scale" type="number" step="0.01"></label>
-    <label>closed off X <input data-bind="closed.position.x" type="number" step="0.01"></label>
-    <label>closed off Z <input data-bind="closed.position.z" type="number" step="0.01"></label>
-    <label>closed rot Y <input data-bind="closed.rotation.y" type="number" step="1"></label>
-    <label>closed scale <input data-bind="closed.scale" type="number" step="0.01"></label>
-    <label>open off X <input data-bind="open.position.x" type="number" step="0.01"></label>
-    <label>open off Z <input data-bind="open.position.z" type="number" step="0.01"></label>
-    <label>open rot Y <input data-bind="open.rotation.y" type="number" step="1"></label>
-    <label>open scale <input data-bind="open.scale" type="number" step="0.01"></label>
-    <button type="button" data-print>Print transforms</button>
-    <small>Keys: arrows move X/Z, PageUp/PageDown move Y, [ ] rotate Y, - = scale, P prints.</small>
-  `;
-  document.body.appendChild(panel);
-
-  const bindings = {
-    'surface.position.x': {
-      get: () => lecternSurface.position.x,
-      set: (value) => { lecternSurface.position.x = value; },
-    },
-    'surface.position.y': {
-      get: () => lecternSurface.position.y,
-      set: (value) => { lecternSurface.position.y = value; },
-    },
-    'surface.position.z': {
-      get: () => lecternSurface.position.z,
-      set: (value) => { lecternSurface.position.z = value; },
-    },
-    'rig.position.x': {
-      get: () => bibleRig.position.x,
-      set: (value) => { bibleRig.position.x = value; },
-    },
-    'rig.position.y': {
-      get: () => bibleRig.position.y,
-      set: (value) => { bibleRig.position.y = value; },
-    },
-    'rig.position.z': {
-      get: () => bibleRig.position.z,
-      set: (value) => { bibleRig.position.z = value; },
-    },
-    'rig.rotation.x': {
-      get: () => THREE.MathUtils.radToDeg(bibleRig.rotation.x),
-      set: (value) => { bibleRig.rotation.x = THREE.MathUtils.degToRad(value); },
-    },
-    'rig.rotation.y': {
-      get: () => THREE.MathUtils.radToDeg(bibleRig.rotation.y),
-      set: (value) => { bibleRig.rotation.y = THREE.MathUtils.degToRad(value); },
-    },
-    'rig.rotation.z': {
-      get: () => THREE.MathUtils.radToDeg(bibleRig.rotation.z),
-      set: (value) => { bibleRig.rotation.z = THREE.MathUtils.degToRad(value); },
-    },
-    'rig.scale': {
-      get: () => bibleRig.scale.x,
-      set: (value) => { bibleRig.scale.setScalar(value); },
-    },
-    'closed.position.x': {
-      get: () => closedModel?.position.x ?? 0,
-      set: (value) => { if (closedModel) closedModel.position.x = value; },
-    },
-    'closed.position.z': {
-      get: () => closedModel?.position.z ?? 0,
-      set: (value) => { if (closedModel) closedModel.position.z = value; },
-    },
-    'closed.rotation.y': {
-      get: () => closedModel ? THREE.MathUtils.radToDeg(closedModel.rotation.y) : 0,
-      set: (value) => { if (closedModel) closedModel.rotation.y = THREE.MathUtils.degToRad(value); },
-    },
-    'closed.scale': {
-      get: () => closedModel?.scale.x ?? 1,
-      set: (value) => { if (closedModel) closedModel.scale.setScalar(value); },
-    },
-    'open.position.x': {
-      get: () => openModel?.position.x ?? 0,
-      set: (value) => { if (openModel) openModel.position.x = value; },
-    },
-    'open.position.z': {
-      get: () => openModel?.position.z ?? 0,
-      set: (value) => { if (openModel) openModel.position.z = value; },
-    },
-    'open.rotation.y': {
-      get: () => openModel ? THREE.MathUtils.radToDeg(openModel.rotation.y) : 0,
-      set: (value) => { if (openModel) openModel.rotation.y = THREE.MathUtils.degToRad(value); },
-    },
-    'open.scale': {
-      get: () => openModel?.scale.x ?? 1,
-      set: (value) => { if (openModel) openModel.scale.setScalar(value); },
-    },
+function getDecalPlacement(coverNode, face) {
+  const isRightCover = coverNode.name.includes('cover-r');
+  return {
+    position: new THREE.Vector3(isRightCover ? 0.965 : -0.965, face < 0 ? 0.05 : -2.05, 0),
+    rotation: new THREE.Euler(face < 0 ? -Math.PI / 2 : Math.PI / 2, 0, 0),
+    size: [1.56, 1.5],
   };
-
-  function printTransforms() {
-    const payload = {
-      lecternSurfacePosition: lecternSurface.position.toArray().map((value) => Number(value.toFixed(4))),
-      lecternSurfaceRotation: eulerToArray(lecternSurface.rotation),
-      bibleRigPosition: bibleRig.position.toArray().map((value) => Number(value.toFixed(4))),
-      bibleRigRotation: eulerToArray(bibleRig.rotation),
-      bibleRigScale: Number(bibleRig.scale.x.toFixed(4)),
-      closedBibleLocalRotation: closedModel ? eulerToArray(closedModel.rotation) : null,
-      closedBibleLocalOffset: closedModel ? closedModel.position.toArray().map((value) => Number(value.toFixed(4))) : null,
-      closedBibleScale: closedModel ? Number(closedModel.scale.x.toFixed(4)) : null,
-      openBibleLocalRotation: openModel ? eulerToArray(openModel.rotation) : null,
-      openBibleLocalOffset: openModel ? openModel.position.toArray().map((value) => Number(value.toFixed(4))) : null,
-      openBibleScale: openModel ? Number(openModel.scale.x.toFixed(4)) : null,
-    };
-    console.info('[BibleRig] calibration values', payload);
-    return payload;
-  }
-
-  function refreshInputs() {
-    panel.querySelectorAll('input[data-bind]').forEach((input) => {
-      const binding = bindings[input.dataset.bind];
-      input.value = Number(binding.get().toFixed(4));
-    });
-  }
-
-  panel.addEventListener('input', (event) => {
-    const input = event.target.closest('input[data-bind]');
-    if (!input) return;
-    bindings[input.dataset.bind].set(Number(input.value));
-  });
-
-  panel.querySelector('[data-print]').addEventListener('click', printTransforms);
-
-  window.addEventListener('keydown', (event) => {
-    if (!debugMode || event.target.closest('input, textarea, select')) return;
-    const move = event.shiftKey ? 0.05 : 0.015;
-    const turn = THREE.MathUtils.degToRad(event.shiftKey ? 5 : 1);
-    const scaleStep = event.shiftKey ? 0.05 : 0.01;
-
-    if (event.key === 'ArrowLeft') bibleRig.position.x -= move;
-    else if (event.key === 'ArrowRight') bibleRig.position.x += move;
-    else if (event.key === 'ArrowUp') bibleRig.position.z -= move;
-    else if (event.key === 'ArrowDown') bibleRig.position.z += move;
-    else if (event.key === 'PageUp') bibleRig.position.y += move;
-    else if (event.key === 'PageDown') bibleRig.position.y -= move;
-    else if (event.key === '[') bibleRig.rotation.y -= turn;
-    else if (event.key === ']') bibleRig.rotation.y += turn;
-    else if (event.key === '-') bibleRig.scale.setScalar(Math.max(0.1, bibleRig.scale.x - scaleStep));
-    else if (event.key === '=') bibleRig.scale.setScalar(bibleRig.scale.x + scaleStep);
-    else if (event.key.toLowerCase() === 'p') printTransforms();
-    else return;
-
-    event.preventDefault();
-    refreshInputs();
-  });
-
-  refreshInputs();
-  window.__MUNADI_BIBLE_RIG__ = { lecternSurface, bibleRig, printTransforms, refreshInputs };
 }
 
-function makeAisle() {
-  const group = new THREE.Group();
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(8.4, 21, 1, 1),
-    new THREE.MeshStandardMaterial({ color: '#241008', roughness: 0.96 }),
+function attachCoverDecal(book, decal) {
+  const targetName = APPROVED_BOOK_TRANSFORMS.cover.target;
+  const coverNode = book.getObjectByName(targetName) || book.getObjectByName(targetName.replace(/_\d+$/, ''));
+  if (!coverNode || !decal) return;
+
+  const base = getDecalPlacement(coverNode, APPROVED_BOOK_TRANSFORMS.cover.face);
+  coverNode.attach(decal);
+  decal.geometry.dispose();
+  decal.geometry = new THREE.PlaneGeometry(base.size[0], base.size[1]);
+  decal.position.copy(base.position).add(toVec3(APPROVED_BOOK_TRANSFORMS.decal.position));
+  decal.rotation.set(
+    base.rotation.x + degToRad(APPROVED_BOOK_TRANSFORMS.decal.rotation[0]),
+    base.rotation.y + degToRad(APPROVED_BOOK_TRANSFORMS.decal.rotation[1]),
+    base.rotation.z + degToRad(APPROVED_BOOK_TRANSFORMS.decal.rotation[2]),
   );
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.z = 0.8;
-  floor.receiveShadow = true;
-  group.add(floor);
-
-  const runner = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.45, 20.5, 1, 1),
-    new THREE.MeshStandardMaterial({ color: '#521b10', roughness: 0.92, transparent: true, opacity: 0.78 }),
-  );
-  runner.rotation.x = -Math.PI / 2;
-  runner.position.set(0, 0.012, 0.55);
-  group.add(runner);
-
-  for (let i = 0; i < 6; i += 1) {
-    const z = 5.4 - i * 2.75;
-    [-2.85, 2.85].forEach((x) => {
-      const pew = new THREE.Mesh(
-        new THREE.BoxGeometry(1.9, 0.2, 0.46),
-        new THREE.MeshStandardMaterial({ color: '#321207', roughness: 0.9 }),
-      );
-      pew.position.set(x, 0.42, z);
-      pew.castShadow = true;
-      pew.receiveShadow = true;
-      group.add(pew);
-    });
-  }
-
-  return group;
+  decal.scale.set(APPROVED_BOOK_TRANSFORMS.decal.scale[0], APPROVED_BOOK_TRANSFORMS.decal.scale[1], 1);
 }
 
-function makeCentralHallMask() {
-  const group = new THREE.Group();
-  const sideMaterial = new THREE.MeshBasicMaterial({
-    color: '#120503',
-    transparent: true,
-    opacity: 0.96,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  });
-  const ceilingMaterial = new THREE.MeshBasicMaterial({
-    color: '#120503',
-    transparent: true,
-    opacity: 0.68,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  });
-
-  [-1.42, 1.42].forEach((x) => {
-    const wall = new THREE.Mesh(new THREE.PlaneGeometry(19, 4.4), sideMaterial);
-    wall.position.set(x, 2.2, -0.2);
-    wall.rotation.y = Math.PI / 2;
-    group.add(wall);
-  });
-
-  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(2.85, 19), ceilingMaterial);
-  ceiling.position.set(0, 4.2, -0.2);
-  ceiling.rotation.x = Math.PI / 2;
-  group.add(ceiling);
-
-  return group;
+function applyBookTransform(bookRig) {
+  bookRig.position.fromArray(APPROVED_BOOK_TRANSFORMS.book.position);
+  bookRig.rotation.set(...APPROVED_BOOK_TRANSFORMS.book.rotation.map(degToRad));
+  bookRig.scale.setScalar(APPROVED_BOOK_TRANSFORMS.book.scale);
 }
 
-function createDust() {
-  const count = lowPowerViewport ? 90 : 180;
-  const positions = new Float32Array(count * 3);
-  const colors = new Float32Array(count * 3);
-
-  for (let i = 0; i < count; i += 1) {
-    positions[i * 3] = (Math.random() - 0.5) * 7.4;
-    positions[i * 3 + 1] = 0.8 + Math.random() * 3.4;
-    positions[i * 3 + 2] = -7.5 + Math.random() * 18;
-    colors[i * 3] = 1;
-    colors[i * 3 + 1] = 0.78 + Math.random() * 0.16;
-    colors[i * 3 + 2] = 0.38 + Math.random() * 0.2;
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  return new THREE.Points(
-    geometry,
-    new THREE.PointsMaterial({
-      size: lowPowerViewport ? 0.022 : 0.016,
-      transparent: true,
-      opacity: 0.36,
-      vertexColors: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    }),
-  );
+function applyAltarTransform(altarRig) {
+  altarRig.position.fromArray(APPROVED_SEQUENCE_CONFIG.altar.position);
+  altarRig.rotation.set(...APPROVED_SEQUENCE_CONFIG.altar.rotation.map(degToRad));
+  altarRig.scale.setScalar(APPROVED_SEQUENCE_CONFIG.altar.scale);
 }
 
-function createDebugLabels(container) {
-  return cameraWaypoints.map((waypoint) => {
-    const label = document.createElement('div');
-    label.className = 'debug-label';
-    label.textContent = waypoint.name;
-    container.appendChild(label);
-    return { label, waypoint };
-  });
+function applyChurchTransform(churchRoot) {
+  churchRoot.position.fromArray(APPROVED_SEQUENCE_CONFIG.church.position);
+  churchRoot.rotation.set(...APPROVED_SEQUENCE_CONFIG.church.rotation.map(degToRad));
+  churchRoot.scale.setScalar(APPROVED_SEQUENCE_CONFIG.church.scale);
+  churchRoot.visible = APPROVED_SEQUENCE_CONFIG.church.visible;
 }
 
-function updateDebugLabels(labels, camera) {
-  if (!labels.length) return;
-  labels.forEach(({ label, waypoint }) => {
-    const projected = new THREE.Vector3().fromArray(waypoint.target).project(camera);
-    const visible = projected.z > -1 && projected.z < 1;
-    label.style.opacity = visible ? '1' : '0';
-    label.style.left = `${(projected.x * 0.5 + 0.5) * window.innerWidth}px`;
-    label.style.top = `${(-projected.y * 0.5 + 0.5) * window.innerHeight}px`;
-  });
-}
-
-async function loadModel(loader, key, path, required = true) {
-  try {
-    const gltf = await loader.loadAsync(path);
-    return { key, model: gltf.scene, error: null };
-  } catch (error) {
-    if (required) setStatus(`Scene asset failed to load: ${key}. Check ${path}`, 'error');
-    return { key, model: null, error };
-  }
+function getCropPlanes() {
+  const crop = APPROVED_SEQUENCE_CONFIG.environment.crop;
+  return [
+    new THREE.Plane(new THREE.Vector3(1, 0, 0), -crop.left),
+    new THREE.Plane(new THREE.Vector3(-1, 0, 0), crop.right),
+    new THREE.Plane(new THREE.Vector3(0, 0, 1), -crop.near),
+    new THREE.Plane(new THREE.Vector3(0, 0, -1), crop.far),
+  ];
 }
 
 function updateHeroOverlay(progress) {
   const heroCopy = document.getElementById('heroCopy');
   const label = document.getElementById('timelineLabel');
-
-  const heroIn = smoothstep(0.52, 0.63, progress);
-  const heroOut = smoothstep(0.76, 0.86, progress);
+  const heroIn = smoothstep(0.48, 0.62, progress);
+  const heroOut = smoothstep(0.78, 0.9, progress);
   const heroOpacity = reducedMotion ? 1 : heroIn * (1 - heroOut);
 
   if (heroCopy) {
     heroCopy.style.opacity = String(heroOpacity);
-    heroCopy.style.transform = `translate3d(0, ${mix(28, -42, heroOut)}px, 0)`;
-    heroCopy.style.pointerEvents = heroOpacity > 0.5 ? 'auto' : 'none';
+    heroCopy.style.transform = `translate3d(0, ${mix(22, -38, heroOut)}px, 0)`;
+    heroCopy.style.pointerEvents = heroOpacity > 0.4 ? 'auto' : 'none';
   }
 
   if (label) {
-    const point = getTimelinePoint(progress);
-    label.textContent = debugMode ? `${Math.round(progress * 100)}% - ${point.name}` : point.name.replaceAll('_', ' ');
+    label.textContent = '';
   }
 }
 
-function updatePageOverlay(progress, camera, pageAnchorGroup) {
-  const overlay = document.getElementById('pageContentOverlay');
-  if (!overlay || !pageAnchorGroup) return;
+function projectPageArea(id, config, opacity, camera, bookRig) {
+  const element = document.getElementById(id);
+  if (!element) return;
+  element.style.setProperty('--page-overlay-opacity', opacity.toFixed(3));
+  if (opacity <= 0.001) return;
 
-  const overlayOpacity = smoothstep(0.948, 0.99, progress);
-  overlay.style.setProperty('--page-overlay-opacity', String(reducedMotion ? 1 : overlayOpacity));
+  const area = new THREE.Object3D();
+  area.position.fromArray(config.position);
+  area.rotation.set(...config.rotation.map(degToRad));
+  area.updateMatrix();
+  const width = Math.max(0.05, config.scale[0]);
+  const height = Math.max(0.05, config.scale[1]);
+  const points = [
+    new THREE.Vector3(-width / 2, 0, -height / 2),
+    new THREE.Vector3(width / 2, 0, -height / 2),
+    new THREE.Vector3(-width / 2, 0, height / 2),
+    new THREE.Vector3(width / 2, 0, height / 2),
+  ].map((point) => bookRig.localToWorld(point.applyMatrix4(area.matrix)).project(camera));
 
-  if (lowPowerViewport) {
-    overlay.style.left = '50%';
-    overlay.style.top = '55%';
-    overlay.style.width = 'min(360px, calc(100vw - 1.5rem))';
-    overlay.style.setProperty('--page-tilt', '0deg');
+  if (!points.every((point) => point.z > -1 && point.z < 1)) {
+    element.style.setProperty('--page-overlay-opacity', '0');
     return;
   }
 
-  const anchors = [
-    new THREE.Vector3(-0.56, 0.1, -0.34),
-    new THREE.Vector3(0.56, 0.1, -0.34),
-    new THREE.Vector3(-0.56, 0.1, 0.34),
-    new THREE.Vector3(0.56, 0.1, 0.34),
-  ].map((point) => pageAnchorGroup.localToWorld(point.clone()).project(camera));
+  const screen = points.map((point) => ({
+    x: (point.x * 0.5 + 0.5) * window.innerWidth,
+    y: (-point.y * 0.5 + 0.5) * window.innerHeight,
+  }));
+  const centerX = screen.reduce((sum, point) => sum + point.x, 0) / screen.length;
+  const centerY = screen.reduce((sum, point) => sum + point.y, 0) / screen.length;
+  const screenWidth = Math.hypot(screen[1].x - screen[0].x, screen[1].y - screen[0].y);
+  const screenHeight = Math.hypot(screen[2].x - screen[0].x, screen[2].y - screen[0].y);
+  const rotation = Math.atan2(screen[1].y - screen[0].y, screen[1].x - screen[0].x);
 
-  const xs = anchors.map((point) => (point.x * 0.5 + 0.5) * window.innerWidth);
-  const ys = anchors.map((point) => (-point.y * 0.5 + 0.5) * window.innerHeight);
-  const left = Math.min(...xs);
-  const right = Math.max(...xs);
-  const top = Math.min(...ys);
-  const bottom = Math.max(...ys);
-  const width = clamp((right - left) * 0.64, 360, 520);
-  const height = clamp((bottom - top) * 0.82, 180, 300);
+  element.style.setProperty('--safe-left', `${centerX}px`);
+  element.style.setProperty('--safe-top', `${centerY}px`);
+  element.style.setProperty('--safe-width', `${THREE.MathUtils.clamp(screenWidth, 120, window.innerWidth * 0.72)}px`);
+  element.style.setProperty('--safe-height', `${THREE.MathUtils.clamp(screenHeight, 80, window.innerHeight * 0.52)}px`);
+  element.style.setProperty('--safe-rotation', `${rotation}rad`);
+}
 
-  overlay.style.left = `${(left + right) / 2}px`;
-  overlay.style.top = `${(top + bottom) / 2 + height * 0.08}px`;
-  overlay.style.width = `${width}px`;
-  overlay.style.setProperty('--page-tilt', '-11deg');
-  overlay.style.maxHeight = `${height}px`;
+function updatePageOverlay(progress, camera, bookRig) {
+  const overlay = document.getElementById('pageContentOverlay');
+  if (!overlay || !bookRig) return;
+  const reveal = reducedMotion ? 1 : smoothstep(0.93, 1, progress);
+  const opacity = reveal * APPROVED_SEQUENCE_CONFIG.overlays.opacity;
+  overlay.style.setProperty('--page-overlay-opacity', String(opacity));
+
+  if (lowPowerViewport) return;
+  projectPageArea('homeLeftPageSafeArea', APPROVED_SEQUENCE_CONFIG.overlays.left, opacity, camera, bookRig);
+  projectPageArea('homeRightPageSafeArea', APPROVED_SEQUENCE_CONFIG.overlays.right, opacity, camera, bookRig);
+}
+
+function scrollProgress() {
+  if (reducedMotion) return 1;
+  const journey = document.getElementById('journey');
+  if (!journey) return 0;
+  const rect = journey.getBoundingClientRect();
+  const max = Math.max(1, journey.offsetHeight - window.innerHeight);
+  return clamp(-rect.top / max);
 }
 
 async function setupScene() {
@@ -732,232 +355,149 @@ async function setupScene() {
     alpha: false,
     powerPreference: 'high-performance',
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lowPowerViewport ? 1.25 : 1.75));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lowPowerViewport ? 1.2 : 1.75));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.08;
+  renderer.toneMappingExposure = 1.18;
   renderer.shadowMap.enabled = !lowPowerViewport;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.localClippingEnabled = true;
+  renderer.clippingPlanes = getCropPlanes();
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#180806');
-  scene.fog = new THREE.FogExp2('#190806', lowPowerViewport ? 0.074 : 0.048);
+  scene.background = new THREE.Color('#090403');
+  scene.fog = new THREE.FogExp2('#090403', lowPowerViewport ? 0.065 : APPROVED_SEQUENCE_CONFIG.environment.fog);
 
-  const camera = new THREE.PerspectiveCamera(lowPowerViewport ? 44 : 38, 1, 0.1, 80);
-  const target = new THREE.Vector3();
-  const loader = new GLTFLoader();
-  loader.setMeshoptDecoder(MeshoptDecoder);
+  const initial = getTimelineFrame(0);
+  const camera = new THREE.PerspectiveCamera(initial.fov, 1, 0.1, 80);
+  camera.position.copy(initial.position);
 
-  scene.add(new THREE.HemisphereLight('#fff0c8', '#120503', 1.08));
-  const key = new THREE.DirectionalLight('#ffd38d', 2.4);
-  key.position.set(-4, 7, 9);
+  scene.add(new THREE.HemisphereLight('#fff2d0', '#1a0704', 1.35));
+  const key = new THREE.DirectionalLight('#ffe0a5', 2.2);
+  key.position.set(-3.8, 6.5, 5.2);
   key.castShadow = !lowPowerViewport;
   scene.add(key);
 
-  const sanctuaryGlow = new THREE.SpotLight('#f0ad5a', 4.1, 28, 0.34, 0.76, 1.2);
-  sanctuaryGlow.position.set(1.4, 5.3, -3.4);
-  sanctuaryGlow.target.position.set(0, 1.1, -6.35);
-  sanctuaryGlow.castShadow = !lowPowerViewport;
-  scene.add(sanctuaryGlow, sanctuaryGlow.target);
+  const altarGlow = new THREE.SpotLight('#ffc06f', 3.8, 18, 0.48, 0.78, 1.15);
+  altarGlow.position.set(2.2, 4.6, -1.8);
+  altarGlow.target.position.set(0, 2.1, -3.55);
+  altarGlow.castShadow = !lowPowerViewport;
+  scene.add(altarGlow, altarGlow.target);
 
-  const doorGlow = new THREE.PointLight('#ffc271', 2.5, 12, 1.6);
-  doorGlow.position.set(0, 2.2, 8.3);
-  scene.add(doorGlow);
+  const loader = new GLTFLoader();
+  loader.setMeshoptDecoder(MeshoptDecoder);
 
-  const world = new THREE.Group();
-  scene.add(world);
-  world.add(makeAisle());
-  const hallMask = makeCentralHallMask();
-  world.add(hallMask);
+  try {
+    const [churchGltf, lecternGltf, bookGltf] = await Promise.all([
+      loader.loadAsync(ASSETS.church),
+      loader.loadAsync(ASSETS.lectern),
+      loader.loadAsync(ASSETS.book),
+    ]);
 
-  const dust = createDust();
-  scene.add(dust);
+    const churchRoot = churchGltf.scene;
+    preserveModelMaterials(churchRoot);
+    applyChurchTransform(churchRoot);
+    scene.add(churchRoot);
 
-  const results = await Promise.all([
-    loadModel(loader, 'door', ASSETS.door),
-    lowPowerViewport ? Promise.resolve({ key: 'interior', model: null, skipped: true }) : loadModel(loader, 'interior', ASSETS.interior, false),
-    loadModel(loader, 'lectern', ASSETS.lectern),
-    loadModel(loader, 'closedBible', ASSETS.closedBible),
-    loadModel(loader, 'openBible', ASSETS.openBible),
-  ]);
+    const altarRig = new THREE.Group();
+    altarRig.name = 'ApprovedLecternBibleAltarRig';
+    applyAltarTransform(altarRig);
+    scene.add(altarRig);
 
-  const loaded = Object.fromEntries(results.map((result) => [result.key, result]));
-  const failures = results.filter((result) => result.error);
-  if (failures.length) {
-    setStatus(`Loaded with ${failures.length} asset issue${failures.length > 1 ? 's' : ''}. See console for details.`, 'error');
-    failures.forEach((failure) => console.error(`Failed to load ${failure.key}`, failure.error));
-  } else {
-    setStatus(lowPowerViewport ? 'Mobile scene loaded with lighter environment.' : 'Church scene loaded.', 'ready');
-  }
+    const lectern = lecternGltf.scene;
+    preserveModelMaterials(lectern);
+    normalizeToGround(lectern, LECTERN_TRANSFORM.targetHeight);
+    lectern.position.fromArray(LECTERN_TRANSFORM.position);
+    lectern.rotation.set(...LECTERN_TRANSFORM.rotation.map(degToRad));
+    altarRig.add(lectern);
 
-  let interior = null;
-  if (loaded.interior?.model) {
-    interior = normalizeToHeight(loaded.interior.model, SCENE_TUNING.interiorHeight);
-    const centerAisleClip = [
-      new THREE.Plane(new THREE.Vector3(1, 0, 0), 1.85),
-      new THREE.Plane(new THREE.Vector3(-1, 0, 0), 1.85),
-      new THREE.Plane(new THREE.Vector3(0, 1, 0), 0.05),
-      new THREE.Plane(new THREE.Vector3(0, 0, -1), 8.2),
-    ];
-    tuneMaterials(interior, {
-      envMapIntensity: 0.28,
-      roughness: 0.92,
-      opacity: 0.07,
-      clippingPlanes: centerAisleClip,
-    });
-    interior.position.fromArray(SCENE_TUNING.interiorPosition);
-    interior.rotation.copy(toEuler(SCENE_TUNING.interiorRotation));
-    world.add(interior);
-  }
+    const bookRig = new THREE.Group();
+    bookRig.name = 'BookRig';
+    applyBookTransform(bookRig);
+    altarRig.add(bookRig);
 
-  let door = null;
-  if (loaded.door?.model) {
-    door = normalizeToHeight(loaded.door.model, SCENE_TUNING.doorHeight);
-    tuneMaterials(door, { envMapIntensity: 0.42, roughness: 0.84 });
-    door.position.fromArray(SCENE_TUNING.doorPosition);
-    door.rotation.copy(toEuler(SCENE_TUNING.doorRotation));
-    world.add(door);
-  }
+    const animatedBook = bookGltf.scene;
+    preserveModelMaterials(animatedBook);
+    bookRig.add(animatedBook);
 
-  const lecternRig = new THREE.Group();
-  lecternRig.position.fromArray(SCENE_TUNING.lecternPosition);
-  lecternRig.rotation.copy(toEuler(SCENE_TUNING.lecternRotation));
-  world.add(lecternRig);
+    const decal = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshStandardMaterial({
+        map: createCoverTexture(),
+        transparent: true,
+        opacity: 0.96,
+        roughness: 0.38,
+        metalness: 0.36,
+        depthTest: false,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    decal.name = 'MunadiCoverDecal';
+    decal.renderOrder = 20;
+    attachCoverDecal(animatedBook, decal);
 
-  if (loaded.lectern?.model) {
-    const lectern = normalizeToGround(loaded.lectern.model);
-    lectern.scale.setScalar(SCENE_TUNING.lecternScale);
-    tuneMaterials(lectern, { envMapIntensity: 0.68, roughness: 0.72 });
-    lecternRig.add(lectern);
-  }
+    const mixer = new THREE.AnimationMixer(animatedBook);
+    const clip = bookGltf.animations[0];
+    const action = clip ? mixer.clipAction(clip) : null;
+    if (action) {
+      action.play();
+      action.paused = true;
+    }
 
-  const lecternSurface = new THREE.Group();
-  lecternSurface.name = 'LecternSurface';
-  lecternSurface.position.fromArray(SCENE_TUNING.lecternSurfacePosition);
-  lecternSurface.rotation.copy(toEuler(SCENE_TUNING.lecternSurfaceRotation));
-  lecternRig.add(lecternSurface);
+    setStatus('Church sequence loaded.', 'ready');
 
-  const [surfaceWidth, surfaceDepth] = SCENE_TUNING.lecternSurfaceSize;
-  const surfacePlane = new THREE.Mesh(
-    new THREE.PlaneGeometry(surfaceWidth, surfaceDepth),
-    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, side: THREE.DoubleSide }),
-  );
-  surfacePlane.name = 'LecternSurfacePlane';
-  surfacePlane.rotation.x = -Math.PI / 2;
-  surfacePlane.visible = false;
-  lecternSurface.add(surfacePlane, createLecternSurfaceHelper(SCENE_TUNING.lecternSurfaceSize));
+    function resize() {
+      const width = Math.max(1, window.innerWidth);
+      const height = Math.max(1, window.innerHeight);
+      renderer.setSize(width, height, false);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+    }
 
-  const bibleRig = new THREE.Group();
-  bibleRig.name = 'BibleRig';
-  bibleRig.position.fromArray(SCENE_TUNING.bibleRigPosition);
-  bibleRig.rotation.copy(toEuler(SCENE_TUNING.bibleRigRotation));
-  bibleRig.scale.setScalar(SCENE_TUNING.bibleRigScale);
-  lecternSurface.add(bibleRig);
+    function updateScene(progress) {
+      const frame = getTimelineFrame(progress);
+      camera.position.copy(frame.position);
+      camera.fov = frame.fov;
+      camera.lookAt(frame.target);
+      camera.updateProjectionMatrix();
 
-  const closedBibleGroup = new THREE.Group();
-  closedBibleGroup.name = 'ClosedBibleSlot';
-  const openBibleGroup = new THREE.Group();
-  openBibleGroup.name = 'OpenBibleSlot';
-  const fakeOpeningGroup = createOpeningRig();
-  const pageAnchorGroup = createPageAnchorGroup();
-  bibleRig.add(closedBibleGroup, openBibleGroup, fakeOpeningGroup, pageAnchorGroup);
-  setOpacity(fakeOpeningGroup, 0);
+      const openProgress = reducedMotion ? 1 : smoothstep(0.82, 0.98, progress);
+      if (action && clip) {
+        mixer.setTime(openProgress * clip.duration * OPEN_CLIP_TIME_RATIO);
+        mixer.update(0);
+      }
 
-  let closedBible = null;
-  if (loaded.closedBible?.model) {
-    closedBible = normalizeBibleModel(loaded.closedBible.model, 'closedBible', {
-      localRotation: SCENE_TUNING.closedBibleLocalRotation,
-      localOffset: SCENE_TUNING.closedBibleLocalOffset,
-      scale: SCENE_TUNING.closedBibleScale,
-      envMapIntensity: 0.96,
-      roughness: 0.76,
-    });
-    closedBibleGroup.add(closedBible);
-  }
+      altarGlow.intensity = mix(2.6, 4.6, smoothstep(0.72, 1, progress));
+      updateHeroOverlay(progress);
+      updatePageOverlay(progress, camera, bookRig);
+    }
 
-  let openBible = null;
-  if (loaded.openBible?.model) {
-    openBible = normalizeBibleModel(loaded.openBible.model, 'openBible', {
-      localRotation: SCENE_TUNING.openBibleLocalRotation,
-      localOffset: SCENE_TUNING.openBibleLocalOffset,
-      scale: SCENE_TUNING.openBibleScale,
-      envMapIntensity: 0.92,
-      roughness: 0.78,
-    });
-    openBibleGroup.add(openBible);
-    setOpacity(openBibleGroup, 0);
-  }
+    let desiredProgress = scrollProgress();
+    let renderedProgress = desiredProgress;
+    let last = performance.now();
 
-  createCalibrationPanel({ lecternSurface, bibleRig, closedModel: closedBible, openModel: openBible });
+    function render(now) {
+      const delta = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      desiredProgress = scrollProgress();
+      renderedProgress = THREE.MathUtils.damp(renderedProgress, desiredProgress, reducedMotion ? 18 : 10, delta);
+      updateScene(renderedProgress);
+      renderer.render(scene, camera);
+      requestAnimationFrame(render);
+    }
 
-  const debugContainer = document.body;
-  const debugLabels = createDebugLabels(debugContainer);
-  function resize() {
-    const width = Math.max(1, window.innerWidth);
-    const height = Math.max(1, window.innerHeight);
-    renderer.setSize(width, height, false);
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
-  }
-
-  function scrollProgress() {
-    if (reducedMotion) return 0.96;
-    const journey = document.getElementById('journey');
-    if (!journey) return 0;
-    const rect = journey.getBoundingClientRect();
-    const max = Math.max(1, journey.offsetHeight - window.innerHeight);
-    return clamp(-rect.top / max);
-  }
-
-  let desiredProgress = scrollProgress();
-  let renderedProgress = desiredProgress;
-  let last = performance.now();
-
-  function updateScene(progress) {
-    const point = getTimelinePoint(progress);
-    camera.position.copy(point.camera);
-    target.copy(point.target);
-    camera.lookAt(target);
-
-    const openingProgress = smoothstep(0.855, 0.922, progress);
-    const fakeOpeningOpacity = smoothstep(0.835, 0.86, progress) * (1 - smoothstep(0.928, 0.966, progress));
-    fakeOpeningGroup.userData.updateOpening(openingProgress);
-    setOpacity(closedBibleGroup, 1 - smoothstep(0.855, 0.878, progress));
-    setOpacity(fakeOpeningGroup, fakeOpeningOpacity);
-    setOpacity(openBibleGroup, smoothstep(0.928, 0.966, progress));
-    if (door) setOpacity(door, 1 - smoothstep(0.08, 0.2, progress));
-    if (interior) setOpacity(interior, mix(0.07, 0.012, smoothstep(0.16, 0.5, progress)));
-    hallMask.visible = progress < 0.62;
-
-    sanctuaryGlow.intensity = mix(3.2, 5.4, smoothstep(0.78, 0.98, progress));
-    doorGlow.intensity = mix(2.5, 0.42, smoothstep(0.08, 0.34, progress));
-    dust.position.z = mix(0, -1, progress);
-
-    updateHeroOverlay(progress);
-    updatePageOverlay(progress, camera, pageAnchorGroup);
-    updateDebugLabels(debugLabels, camera);
-  }
-
-  function render(now) {
-    const delta = Math.min(0.05, (now - last) / 1000);
-    last = now;
-    desiredProgress = scrollProgress();
-    renderedProgress = THREE.MathUtils.damp(renderedProgress, desiredProgress, reducedMotion ? 18 : 12, delta);
-    dust.rotation.y += delta * 0.016;
-    updateScene(renderedProgress);
-    renderer.render(scene, camera);
+    resize();
+    window.addEventListener('resize', resize, { passive: true });
+    window.addEventListener('scroll', () => {
+      desiredProgress = scrollProgress();
+    }, { passive: true });
+    updateScene(desiredProgress);
     requestAnimationFrame(render);
+  } catch (error) {
+    console.error(error);
+    setStatus(`Scene failed to load: ${error.message}`, 'error');
   }
-
-  resize();
-  window.addEventListener('resize', resize, { passive: true });
-  window.addEventListener('scroll', () => {
-    desiredProgress = scrollProgress();
-  }, { passive: true });
-
-  updateScene(desiredProgress);
-  requestAnimationFrame(render);
 }
 
 function setupNavSpy() {
@@ -994,16 +534,11 @@ function setupAnchorNavigation() {
         return;
       }
 
-      if (link.dataset.scrollDebug === 'true') {
-        document.documentElement.classList.add('debug-scene');
-      }
-
       target.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
     });
   });
 }
 
-document.documentElement.classList.toggle('debug-scene', debugMode);
 document.documentElement.style.scrollBehavior = reducedMotion ? 'auto' : 'smooth';
 
 setupScene();

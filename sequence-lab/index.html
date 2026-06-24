@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Munadi Hope Center Sequence Lab</title>
+    <title>Munadi Hope Center Sequence Lab - Archived Calibration Tool</title>
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='6' fill='%23210f08'/%3E%3Cpath d='M24 10v28M14 18h20' stroke='%23F1D27A' stroke-width='2.8' stroke-linecap='round'/%3E%3C/svg%3E"
@@ -23,8 +23,8 @@
 
       <section class="lab-panel" aria-label="Sequence calibration controls">
         <p class="eyebrow">Munadi Hope Center</p>
-        <h1>Sequence Lab</h1>
-        <p class="lab-note">Calibrate the church journey. Homepage files are untouched.</p>
+        <h1>Sequence Lab — Archived Calibration Tool</h1>
+        <p class="lab-note">Dev-only calibration page. The public homepage now uses the locked approved sequence config.</p>
 
         <div class="control-grid" id="controls">
           <label>
@@ -48,6 +48,8 @@
             <button type="button" data-camera-preset="aisle_walk_mid">Aisle Walk Mid</button>
             <button type="button" data-camera-preset="altar_approach">Altar Approach</button>
             <button type="button" data-camera-preset="lectern_end_point">Lectern End Point</button>
+            <button type="button" data-camera-preset="bible_closeup">Bible Closeup</button>
+            <button type="button" data-camera-preset="bible_open_pages">Open Bible Pages</button>
           </div>
           <p class="section-help">Aisle Reveal should match the centered reference view: pews left and right, altar ahead, stained glass visible, human eye level.</p>
 
@@ -141,6 +143,8 @@
           <button class="print-button" id="printValues" type="button">Print final book config</button>
           <button class="print-button secondary" id="resetDefaults" type="button">Reset to approved book placement</button>
           <button class="print-button" id="saveAisleReveal" type="button">Save this as aisle reveal view</button>
+          <button class="print-button" id="exportApprovedConfig" type="button">Export approved config</button>
+          <button class="print-button secondary" id="applyApprovedConfig" type="button">Apply approved config to homepage</button>
           <button class="print-button" id="printSequence" type="button">Print final sequence config</button>
           <button class="print-button" id="saveSequence" type="button">Save current sequence to localStorage</button>
           <button class="print-button secondary" id="resetSequence" type="button">Reset church sequence</button>

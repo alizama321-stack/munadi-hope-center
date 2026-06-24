@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { APPROVED_BOOK_TRANSFORMS, APPROVED_SEQUENCE_CONFIG } from '../src/approved-sequence-config.js';
 
 const ASSETS = {
   book: '/public/assets/models/book_animated_book__historical_book.glb',
@@ -20,22 +21,7 @@ const LOCKED_LECTERN_TRANSFORM = {
   targetHeight: 2.05,
 };
 
-const BOOK_LAB_FINAL_TRANSFORMS = {
-  cover: {
-    target: 'cover-l_36',
-    face: 1,
-  },
-  book: {
-    position: [-0.33, 2.02, -0.12],
-    rotation: [18, 0, 360],
-    scale: 0.26,
-  },
-  decal: {
-    position: [0, 0, 0],
-    rotation: [0, 0, 180],
-    scale: [1.36, 1.35],
-  },
-};
+const BOOK_LAB_FINAL_TRANSFORMS = APPROVED_BOOK_TRANSFORMS;
 
 const OPEN_CLIP_TIME_RATIO = 0.5;
 
@@ -45,6 +31,8 @@ const PRESET_LABELS = {
   aisle_walk_mid: 'Aisle Walk Mid',
   altar_approach: 'Altar Approach',
   lectern_end_point: 'Lectern End Point',
+  bible_closeup: 'Bible Closeup',
+  bible_open_pages: 'Open Bible Pages',
 };
 
 const HUMAN_AXIS_LABELS = {
@@ -65,78 +53,7 @@ const HUMAN_AXIS_LABELS = {
   },
 };
 
-const BOOK_LAB_DEFAULT_SEQUENCE = {
-  progress: 0,
-  camera: {
-    presets: {
-      gate_entry: {
-        position: [0, 1.95, 7.25],
-        target: [0, 2.1, 2.8],
-        fov: 50,
-        distance: 1,
-      },
-      aisle_reveal: {
-        position: [0, 1.85, 4.65],
-        target: [0, 2.55, -3.0],
-        fov: 62,
-        distance: 1,
-      },
-      aisle_walk_mid: {
-        position: [0, 1.88, 2.05],
-        target: [0, 2.35, -3.25],
-        fov: 48,
-        distance: 1,
-      },
-      altar_approach: {
-        position: [0, 2.02, -0.75],
-        target: [0, 2.18, -3.5],
-        fov: 36,
-        distance: 1,
-      },
-      lectern_end_point: {
-        position: [0, 2.18, -2.0],
-        target: [0, 2.16, -3.55],
-        fov: 30,
-        distance: 1,
-      },
-    },
-  },
-  altar: {
-    position: [0, 0, -3.55],
-    rotation: [0, 180, 0],
-    scale: 1,
-  },
-  church: {
-    position: [0, -0.2, 0],
-    rotation: [0, 0, 0],
-    scale: 0.82,
-    visible: true,
-  },
-  environment: {
-    fog: 0.038,
-    darkness: 0.42,
-    crop: {
-      left: -8,
-      right: 8,
-      near: -8,
-      far: 6,
-    },
-  },
-  overlays: {
-    opacity: 0.86,
-    borderVisible: true,
-    left: {
-      position: [-0.92, -0.46, -0.08],
-      rotation: [0, 0, 0],
-      scale: [1.18, 0.84],
-    },
-    right: {
-      position: [0.55, -0.46, -0.03],
-      rotation: [0, 0, 0],
-      scale: [1.2, 0.84],
-    },
-  },
-};
+const BOOK_LAB_DEFAULT_SEQUENCE = APPROVED_SEQUENCE_CONFIG;
 
 function cloneConfig(value) {
   return JSON.parse(JSON.stringify(value));
@@ -239,6 +156,8 @@ function normalizeSequenceConfig(value = {}) {
         aisle_walk_mid: normalizePreset('aisle_walk_mid', ['aisle', 'stage']),
         altar_approach: normalizePreset('altar_approach', ['stage', 'cover']),
         lectern_end_point: normalizePreset('lectern_end_point', ['altar', 'bible', 'pages']),
+        bible_closeup: normalizePreset('bible_closeup', ['bible', 'cover']),
+        bible_open_pages: normalizePreset('bible_open_pages', ['pages']),
       },
     },
     altar: {
@@ -691,21 +610,21 @@ function createPageSpread() {
 }
 
 function tuneBookMaterials(book) {
-  const coverMaterial = makeCoverMaterial();
   book.traverse((child) => {
     if (!child.isMesh) return;
     child.castShadow = true;
     child.receiveShadow = true;
-    const parentName = child.parent?.name || '';
-    if (parentName.includes('cover')) {
-      child.material = coverMaterial.clone();
-    } else if (parentName.includes('paper')) {
-      child.material = new THREE.MeshStandardMaterial({
-        color: '#ead8aa',
-        roughness: 0.9,
-        map: child.material?.map || null,
-      });
-    }
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+    child.material = Array.isArray(child.material)
+      ? materials.map((material) => material?.clone())
+      : child.material?.clone();
+    const nextMaterials = Array.isArray(child.material) ? child.material : [child.material];
+    nextMaterials.forEach((material) => {
+      if (!material) return;
+      if (material.map) material.map.colorSpace = THREE.SRGBColorSpace;
+      if ('envMapIntensity' in material) material.envMapIntensity = 0.72;
+      material.needsUpdate = true;
+    });
   });
 }
 
@@ -800,10 +719,14 @@ function getCameraKey(presetName) {
   if (presetName === 'aisle_walk_mid') return 'aisle_walk_mid';
   if (presetName === 'altar_approach') return 'altar_approach';
   if (presetName === 'lectern_end_point') return 'lectern_end_point';
+  if (presetName === 'bible_closeup') return 'bible_closeup';
+  if (presetName === 'bible_open_pages') return 'bible_open_pages';
   if (presetName === 'entrance' || presetName === 'hero_view' || presetName === 'hero') return 'gate_entry';
   if (presetName === 'aisle') return 'aisle_reveal';
   if (presetName === 'stage' || presetName === 'cover_closeup' || presetName === 'cover') return 'altar_approach';
-  if (presetName === 'altar' || presetName === 'bible' || presetName === 'open_pages_view' || presetName === 'open_pages_fullscreen' || presetName === 'pages') return 'lectern_end_point';
+  if (presetName === 'altar') return 'lectern_end_point';
+  if (presetName === 'bible') return 'bible_closeup';
+  if (presetName === 'open_pages_view' || presetName === 'open_pages_fullscreen' || presetName === 'pages') return 'bible_open_pages';
   return 'gate_entry';
 }
 
@@ -855,14 +778,19 @@ function setSequenceProgress(value) {
   sequenceState.progress = progress;
   let openProgress = 0;
 
-  if (progress < 0.18) {
-    mixPreset('gate_entry', 'aisle_reveal', progress / 0.18);
-  } else if (progress < 0.45) {
-    mixPreset('aisle_reveal', 'aisle_walk_mid', (progress - 0.18) / 0.27);
+  if (progress < 0.16) {
+    mixPreset('gate_entry', 'aisle_reveal', progress / 0.16);
+  } else if (progress < 0.38) {
+    mixPreset('aisle_reveal', 'aisle_walk_mid', (progress - 0.16) / 0.22);
+  } else if (progress < 0.58) {
+    mixPreset('aisle_walk_mid', 'altar_approach', (progress - 0.38) / 0.2);
   } else if (progress < 0.72) {
-    mixPreset('aisle_walk_mid', 'altar_approach', (progress - 0.45) / 0.27);
+    mixPreset('altar_approach', 'lectern_end_point', (progress - 0.58) / 0.14);
+  } else if (progress < 0.86) {
+    mixPreset('lectern_end_point', 'bible_closeup', (progress - 0.72) / 0.14);
   } else {
-    mixPreset('altar_approach', 'lectern_end_point', (progress - 0.72) / 0.28);
+    mixPreset('bible_closeup', 'bible_open_pages', (progress - 0.86) / 0.14);
+    openProgress = smoothstep((progress - 0.82) / 0.16);
   }
 
   const animationInput = document.getElementById('animationProgress');
@@ -1094,15 +1022,6 @@ function applyEnvironment() {
   if (cropMask) {
     cropMask.style.setProperty('--mask-opacity', String(THREE.MathUtils.clamp(sequenceState.environment.darkness * 0.72, 0.12, 0.62)));
   }
-
-  if (churchRoot) {
-    const tone = THREE.MathUtils.lerp(1, 0.38, sequenceState.environment.darkness);
-    churchRoot.traverse((child) => {
-      if (!child.isMesh || !child.material?.color) return;
-      child.material.color.setScalar(tone);
-      child.material.needsUpdate = true;
-    });
-  }
 }
 
 function setupControls() {
@@ -1124,10 +1043,12 @@ function setupControls() {
       if (sequenceInput) {
         sequenceState.progress = {
           gate_entry: 0,
-          aisle_reveal: 0.18,
-          aisle_walk_mid: 0.45,
-          altar_approach: 0.72,
-          lectern_end_point: 1,
+          aisle_reveal: 0.16,
+          aisle_walk_mid: 0.38,
+          altar_approach: 0.58,
+          lectern_end_point: 0.72,
+          bible_closeup: 0.86,
+          bible_open_pages: 1,
         }[getCameraKey(preset)] ?? 0;
         sequenceInput.value = String(sequenceState.progress);
       }
@@ -1172,6 +1093,8 @@ function setupControls() {
   document.getElementById('printValues').addEventListener('click', printValues);
   document.getElementById('resetDefaults').addEventListener('click', resetToFinalApprovedValues);
   document.getElementById('saveAisleReveal').addEventListener('click', saveCurrentCameraAsAisleReveal);
+  document.getElementById('exportApprovedConfig').addEventListener('click', exportApprovedConfig);
+  document.getElementById('applyApprovedConfig').addEventListener('click', applyApprovedConfig);
   document.getElementById('printSequence').addEventListener('click', printSequenceConfig);
   document.getElementById('saveSequence').addEventListener('click', saveCurrentSequence);
   document.getElementById('resetSequence').addEventListener('click', resetSequenceConfig);
@@ -1227,6 +1150,35 @@ function printSequenceConfig() {
   const configText = `const SEQUENCE_LAB_DEFAULT_SEQUENCE = ${JSON.stringify(getSequenceConfigForExport(), null, 2)};`;
   console.info('[SequenceLab] final sequence config\n%s', configText);
   setStatus('Printed final sequence config to console.');
+}
+
+function exportApprovedConfig() {
+  console.info('[SequenceLab] APPROVED_SEQUENCE_CONFIG\n%s', JSON.stringify(APPROVED_SEQUENCE_CONFIG, null, 2));
+  console.info('[SequenceLab] APPROVED_BOOK_TRANSFORMS\n%s', JSON.stringify(APPROVED_BOOK_TRANSFORMS, null, 2));
+  setStatus('Exported approved source config to console.');
+}
+
+function applyApprovedConfig() {
+  setStateFromTransforms(APPROVED_BOOK_TRANSFORMS);
+  const next = normalizeSequenceConfig(APPROVED_SEQUENCE_CONFIG);
+  sequenceState.progress = next.progress;
+  sequenceState.camera = next.camera;
+  sequenceState.altar = next.altar;
+  sequenceState.church = next.church;
+  sequenceState.environment = next.environment;
+  sequenceState.overlays = next.overlays;
+  persistTransforms();
+  persistSequenceConfig();
+  applyBookTransform();
+  applyAltarTransform();
+  applyChurchTransform();
+  applyEnvironment();
+  syncInputs();
+  syncSequenceInputs();
+  attachDecalToCover(state.coverTarget);
+  applyDecalTransform();
+  setSequenceProgress(sequenceState.progress);
+  setStatus('Applied approved config. Homepage already imports this source config.');
 }
 
 function saveCurrentSequence() {
