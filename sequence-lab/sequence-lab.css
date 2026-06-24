@@ -37,6 +37,18 @@ body {
   height: 100%;
 }
 
+.church-crop-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: var(--mask-opacity, 0.32);
+  background:
+    linear-gradient(90deg, rgba(5, 2, 1, 0.94), transparent 15%, transparent 85%, rgba(5, 2, 1, 0.94)),
+    linear-gradient(180deg, rgba(5, 2, 1, 0.78), transparent 18%, transparent 78%, rgba(5, 2, 1, 0.78)),
+    radial-gradient(circle at 50% 48%, transparent 38%, rgba(5, 2, 1, 0.72) 100%);
+}
+
 .lab-panel {
   position: fixed;
   left: clamp(1rem, 2.2vw, 1.6rem);

@@ -12,7 +12,7 @@ const ASSETS = {
 const DEBUG_MODE = new URLSearchParams(window.location.search).get('debug') === '1';
 
 const BOOK_LAB_STORAGE_KEY = 'munadiHopeCenter.bookLab.transforms';
-const BOOK_LAB_SEQUENCE_STORAGE_KEY = 'munadiHopeCenter.sequenceLab.sequence';
+const BOOK_LAB_SEQUENCE_STORAGE_KEY = 'munadiHopeCenter.sequenceLab.v2.sequence';
 
 const LOCKED_LECTERN_TRANSFORM = {
   position: [0, 0, 0],
@@ -40,22 +40,22 @@ const BOOK_LAB_FINAL_TRANSFORMS = {
 const OPEN_CLIP_TIME_RATIO = 0.5;
 
 const PRESET_LABELS = {
-  entrance: 'Entrance View',
-  aisle: 'Aisle Walk',
-  stage: 'Stage Approach',
-  altar: 'Altar / Lectern End Point',
-  bible: 'Bible Closeup Preview',
+  gate_entry: 'Gate Entry',
+  aisle_reveal: 'Aisle Reveal',
+  aisle_walk_mid: 'Aisle Walk Mid',
+  altar_approach: 'Altar Approach',
+  lectern_end_point: 'Lectern End Point',
 };
 
 const HUMAN_AXIS_LABELS = {
   position: {
     x: 'Move Left / Right',
-    y: 'Move Up / Down',
+    y: 'Move Higher / Lower',
     z: 'Move Forward / Back',
   },
   target: {
-    x: 'Look At Left / Right',
-    y: 'Look Higher / Lower',
+    x: 'Look Left / Right',
+    y: 'Look Up / Down',
     z: 'Look Closer / Further',
   },
   rotation: {
@@ -69,34 +69,34 @@ const BOOK_LAB_DEFAULT_SEQUENCE = {
   progress: 0,
   camera: {
     presets: {
-      entrance: {
-        position: [0, 2.1, 9.2],
-        target: [0, 2.0, 4.2],
+      gate_entry: {
+        position: [0, 1.95, 7.25],
+        target: [0, 2.1, 2.8],
+        fov: 50,
+        distance: 1,
+      },
+      aisle_reveal: {
+        position: [0, 1.85, 4.65],
+        target: [0, 2.55, -3.0],
+        fov: 62,
+        distance: 1,
+      },
+      aisle_walk_mid: {
+        position: [0, 1.88, 2.05],
+        target: [0, 2.35, -3.25],
         fov: 48,
         distance: 1,
       },
-      aisle: {
-        position: [0, 2.0, 4.9],
-        target: [0, 2.05, 0.7],
-        fov: 42,
+      altar_approach: {
+        position: [0, 2.02, -0.75],
+        target: [0, 2.18, -3.5],
+        fov: 36,
         distance: 1,
       },
-      stage: {
-        position: [0, 2.18, 1.25],
-        target: [0, 2.12, -2.1],
-        fov: 34,
-        distance: 1,
-      },
-      altar: {
-        position: [0, 2.3, -1.45],
-        target: [0, 2.08, -3.45],
-        fov: 28,
-        distance: 1,
-      },
-      bible: {
-        position: [-0.1, 3.08, -3.04],
-        target: [0, 2.26, -3.55],
-        fov: 22,
+      lectern_end_point: {
+        position: [0, 2.18, -2.0],
+        target: [0, 2.16, -3.55],
+        fov: 30,
         distance: 1,
       },
     },
@@ -113,8 +113,14 @@ const BOOK_LAB_DEFAULT_SEQUENCE = {
     visible: true,
   },
   environment: {
-    fog: 0.055,
-    darkness: 0.78,
+    fog: 0.038,
+    darkness: 0.42,
+    crop: {
+      left: -8,
+      right: 8,
+      near: -8,
+      far: 6,
+    },
   },
   overlays: {
     opacity: 0.86,
@@ -212,8 +218,9 @@ function normalizeSequenceConfig(value = {}) {
   const overlays = source.overlays || {};
   const left = overlays.left || {};
   const right = overlays.right || {};
-  const normalizePreset = (key, legacyKey = key) => {
-    const preset = presetSource[key] || camera[legacyKey] || {};
+  const normalizePreset = (key, legacyKeys = []) => {
+    const legacyList = Array.isArray(legacyKeys) ? legacyKeys : [legacyKeys];
+    const preset = presetSource[key] || legacyList.map((legacyKey) => presetSource[legacyKey] || camera[legacyKey]).find(Boolean) || {};
     const fallback = defaults.camera.presets[key];
     return {
       position: [...(preset.position || fallback.position)],
@@ -227,11 +234,11 @@ function normalizeSequenceConfig(value = {}) {
     progress: Number(source.progress ?? defaults.progress),
     camera: {
       presets: {
-        entrance: normalizePreset('entrance', 'hero'),
-        aisle: normalizePreset('aisle', 'hero'),
-        stage: normalizePreset('stage', 'cover'),
-        altar: normalizePreset('altar', 'cover'),
-        bible: normalizePreset('bible', 'pages'),
+        gate_entry: normalizePreset('gate_entry', ['entrance', 'hero']),
+        aisle_reveal: normalizePreset('aisle_reveal', ['aisle', 'hero']),
+        aisle_walk_mid: normalizePreset('aisle_walk_mid', ['aisle', 'stage']),
+        altar_approach: normalizePreset('altar_approach', ['stage', 'cover']),
+        lectern_end_point: normalizePreset('lectern_end_point', ['altar', 'bible', 'pages']),
       },
     },
     altar: {
@@ -248,6 +255,12 @@ function normalizeSequenceConfig(value = {}) {
     environment: {
       fog: Number(source.environment?.fog ?? defaults.environment.fog),
       darkness: Number(source.environment?.darkness ?? defaults.environment.darkness),
+      crop: {
+        left: Number(source.environment?.crop?.left ?? defaults.environment.crop.left),
+        right: Number(source.environment?.crop?.right ?? defaults.environment.crop.right),
+        near: Number(source.environment?.crop?.near ?? defaults.environment.crop.near),
+        far: Number(source.environment?.crop?.far ?? defaults.environment.crop.far),
+      },
     },
     overlays: {
       opacity: Number(overlays.opacity ?? defaults.overlays.opacity),
@@ -304,6 +317,12 @@ function getSequenceConfigForExport() {
     environment: {
       fog: Number(sequenceState.environment.fog.toFixed(4)),
       darkness: Number(sequenceState.environment.darkness.toFixed(4)),
+      crop: {
+        left: Number(sequenceState.environment.crop.left.toFixed(4)),
+        right: Number(sequenceState.environment.crop.right.toFixed(4)),
+        near: Number(sequenceState.environment.crop.near.toFixed(4)),
+        far: Number(sequenceState.environment.crop.far.toFixed(4)),
+      },
     },
     overlays: {
       opacity: Number(sequenceState.overlays.opacity.toFixed(4)),
@@ -338,12 +357,13 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.localClippingEnabled = true;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#140604');
 scene.fog = new THREE.FogExp2('#140604', 0.035);
 
-const initialCameraFrame = getCameraFrame('entrance');
+const initialCameraFrame = getCameraFrame('gate_entry');
 const camera = new THREE.PerspectiveCamera(initialCameraFrame.fov, 1, 0.1, 80);
 camera.position.copy(initialCameraFrame.position);
 
@@ -775,15 +795,16 @@ function setAnimationProgress(value) {
 }
 
 function getCameraKey(presetName) {
-  if (presetName === 'entrance') return 'entrance';
-  if (presetName === 'aisle') return 'aisle';
-  if (presetName === 'stage') return 'stage';
-  if (presetName === 'altar') return 'altar';
-  if (presetName === 'bible') return 'bible';
-  if (presetName === 'hero_view' || presetName === 'hero') return 'entrance';
-  if (presetName === 'cover_closeup' || presetName === 'cover') return 'stage';
-  if (presetName === 'open_pages_view' || presetName === 'open_pages_fullscreen' || presetName === 'pages') return 'bible';
-  return 'entrance';
+  if (presetName === 'gate_entry') return 'gate_entry';
+  if (presetName === 'aisle_reveal') return 'aisle_reveal';
+  if (presetName === 'aisle_walk_mid') return 'aisle_walk_mid';
+  if (presetName === 'altar_approach') return 'altar_approach';
+  if (presetName === 'lectern_end_point') return 'lectern_end_point';
+  if (presetName === 'entrance' || presetName === 'hero_view' || presetName === 'hero') return 'gate_entry';
+  if (presetName === 'aisle') return 'aisle_reveal';
+  if (presetName === 'stage' || presetName === 'cover_closeup' || presetName === 'cover') return 'altar_approach';
+  if (presetName === 'altar' || presetName === 'bible' || presetName === 'open_pages_view' || presetName === 'open_pages_fullscreen' || presetName === 'pages') return 'lectern_end_point';
+  return 'gate_entry';
 }
 
 function getCameraFrame(presetName) {
@@ -834,14 +855,14 @@ function setSequenceProgress(value) {
   sequenceState.progress = progress;
   let openProgress = 0;
 
-  if (progress < 0.25) {
-    mixPreset('entrance', 'aisle', progress / 0.25);
-  } else if (progress < 0.55) {
-    mixPreset('aisle', 'stage', (progress - 0.25) / 0.3);
-  } else if (progress < 0.82) {
-    mixPreset('stage', 'altar', (progress - 0.55) / 0.27);
+  if (progress < 0.18) {
+    mixPreset('gate_entry', 'aisle_reveal', progress / 0.18);
+  } else if (progress < 0.45) {
+    mixPreset('aisle_reveal', 'aisle_walk_mid', (progress - 0.18) / 0.27);
+  } else if (progress < 0.72) {
+    mixPreset('aisle_walk_mid', 'altar_approach', (progress - 0.45) / 0.27);
   } else {
-    setCameraGoal('altar');
+    mixPreset('altar_approach', 'lectern_end_point', (progress - 0.72) / 0.28);
   }
 
   const animationInput = document.getElementById('animationProgress');
@@ -915,6 +936,7 @@ function getSequenceValue(path) {
   }
 
   if (parts[0] === 'environment') {
+    if (parts[1] === 'crop') return sequenceState.environment.crop[parts[2]];
     return sequenceState.environment[parts[1]];
   }
 
@@ -975,7 +997,11 @@ function setSequenceValue(path, rawValue, isChecked = false) {
   }
 
   if (parts[0] === 'environment') {
-    sequenceState.environment[parts[1]] = Number(rawValue);
+    if (parts[1] === 'crop') {
+      sequenceState.environment.crop[parts[2]] = Number(rawValue);
+    } else {
+      sequenceState.environment[parts[1]] = Number(rawValue);
+    }
     applyEnvironment();
     return;
   }
@@ -1026,7 +1052,7 @@ function createJourneyPresetControls() {
       ${makeControlLabel(HUMAN_AXIS_LABELS.target.y, `camera.${key}.target.y`)}
       ${makeControlLabel(HUMAN_AXIS_LABELS.target.z, `camera.${key}.target.z`)}
       ${makeControlLabel('Zoom In / Out', `camera.${key}.fov`, '1', 'number', 'min="12" max="70"')}
-      ${makeControlLabel('Camera Distance', `camera.${key}.distance`, '0.01', 'number', 'min="0.3" max="2.5"')}
+      ${makeControlLabel('Move Closer / Further', `camera.${key}.distance`, '0.01', 'number', 'min="0.3" max="2.5"')}
     </div>
   `).join('');
 }
@@ -1052,6 +1078,23 @@ function applyEnvironment() {
     0.025 * (1 - sequenceState.environment.darkness),
   );
   scene.fog = new THREE.FogExp2('#090403', sequenceState.environment.fog);
+  const crop = sequenceState.environment.crop;
+  const left = Math.min(crop.left, crop.right - 0.1);
+  const right = Math.max(crop.right, crop.left + 0.1);
+  const near = Math.min(crop.near, crop.far - 0.1);
+  const far = Math.max(crop.far, crop.near + 0.1);
+  renderer.clippingPlanes = [
+    new THREE.Plane(new THREE.Vector3(1, 0, 0), -left),
+    new THREE.Plane(new THREE.Vector3(-1, 0, 0), right),
+    new THREE.Plane(new THREE.Vector3(0, 0, 1), -near),
+    new THREE.Plane(new THREE.Vector3(0, 0, -1), far),
+  ];
+
+  const cropMask = document.getElementById('churchCropMask');
+  if (cropMask) {
+    cropMask.style.setProperty('--mask-opacity', String(THREE.MathUtils.clamp(sequenceState.environment.darkness * 0.72, 0.12, 0.62)));
+  }
+
   if (churchRoot) {
     const tone = THREE.MathUtils.lerp(1, 0.38, sequenceState.environment.darkness);
     churchRoot.traverse((child) => {
@@ -1076,15 +1119,16 @@ function setupControls() {
       const sequenceInput = document.getElementById('sequenceProgress');
 
       setCameraGoal(preset);
-      if (getCameraKey(preset) === 'bible') {
-        if (animationInput) animationInput.value = '1';
-        setAnimationProgress(1);
-      } else {
-        if (animationInput) animationInput.value = '0';
-        setAnimationProgress(0);
-      }
+      if (animationInput) animationInput.value = '0';
+      setAnimationProgress(0);
       if (sequenceInput) {
-        sequenceState.progress = { entrance: 0, aisle: 0.25, stage: 0.55, altar: 1, bible: 1 }[getCameraKey(preset)] ?? 0;
+        sequenceState.progress = {
+          gate_entry: 0,
+          aisle_reveal: 0.18,
+          aisle_walk_mid: 0.45,
+          altar_approach: 0.72,
+          lectern_end_point: 1,
+        }[getCameraKey(preset)] ?? 0;
         sequenceInput.value = String(sequenceState.progress);
       }
       syncSequenceInputs();
@@ -1127,6 +1171,7 @@ function setupControls() {
 
   document.getElementById('printValues').addEventListener('click', printValues);
   document.getElementById('resetDefaults').addEventListener('click', resetToFinalApprovedValues);
+  document.getElementById('saveAisleReveal').addEventListener('click', saveCurrentCameraAsAisleReveal);
   document.getElementById('printSequence').addEventListener('click', printSequenceConfig);
   document.getElementById('saveSequence').addEventListener('click', saveCurrentSequence);
   document.getElementById('resetSequence').addEventListener('click', resetSequenceConfig);
@@ -1162,6 +1207,20 @@ function resetToFinalApprovedValues() {
   applyDecalTransform();
   updatePageOverlay();
   setStatus('Reset to approved book and lectern placement.');
+}
+
+function saveCurrentCameraAsAisleReveal() {
+  sequenceState.camera.presets.aisle_reveal = {
+    position: toFixedArray(camera.position.toArray()),
+    target: toFixedArray(controls.target.toArray()),
+    fov: Number(camera.fov.toFixed(4)),
+    distance: 1,
+  };
+  sequenceState.progress = 0.18;
+  persistSequenceConfig();
+  syncSequenceInputs();
+  printSequenceConfig();
+  setStatus('Saved current camera as the aisle reveal view.');
 }
 
 function printSequenceConfig() {
