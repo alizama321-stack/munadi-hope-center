@@ -7,17 +7,20 @@ const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matc
 const lowPowerViewport = window.matchMedia('(max-width: 720px)').matches;
 
 const ASSETS = {
+  door: '/public/assets/models/optimized/wooden_church_door.glb',
   book: '/public/assets/models/book_animated_book__historical_book.glb',
   lectern: '/public/assets/models/optimized/lectern.glb',
   church: '/public/assets/models/optimized/st_bartholomew-the-less_interior.glb',
 };
 
 const LECTERN_TRANSFORM = APPROVED_SEQUENCE_CONFIG.lectern;
+const GATE_DOOR_CONFIG = APPROVED_SEQUENCE_CONFIG.gateDoor;
 
 const APPROVED_BOOK_TRANSFORMS = APPROVED_SEQUENCE_CONFIG.book;
 const OPENING_CONFIG = APPROVED_SEQUENCE_CONFIG.opening;
 const LIGHTING_CONFIG = APPROVED_SEQUENCE_CONFIG.lighting;
 const MATERIAL_CONFIG = APPROVED_SEQUENCE_CONFIG.materials;
+const SMOOTHING_CONFIG = APPROVED_SEQUENCE_CONFIG.smoothing;
 const timeline = [
   { at: 0, key: 'gate_entry' },
   { at: 0.16, key: 'aisle_reveal' },
@@ -110,18 +113,27 @@ function preserveModelMaterials(object) {
   });
 }
 
-function setOpacity(object, opacity) {
-  object.visible = opacity > 0.01;
+function createOpacityController(object) {
+  const materials = new Set();
   object.traverse((child) => {
     if (!child.isMesh || !child.material) return;
-    const materials = Array.isArray(child.material) ? child.material : [child.material];
+    const next = Array.isArray(child.material) ? child.material : [child.material];
+    next.forEach((material) => materials.add(material));
+  });
+
+  let currentOpacity = -1;
+  return (opacity) => {
+    const nextOpacity = clamp(opacity);
+    if (Math.abs(nextOpacity - currentOpacity) < 0.002) return;
+    currentOpacity = nextOpacity;
+    object.visible = nextOpacity > 0.01;
     materials.forEach((material) => {
-      material.transparent = opacity < 0.999;
-      material.opacity = opacity;
-      material.depthWrite = opacity > 0.98;
+      material.transparent = nextOpacity < 0.999;
+      material.opacity = nextOpacity;
+      material.depthWrite = nextOpacity > 0.98;
       material.needsUpdate = true;
     });
-  });
+  };
 }
 
 function normalizeToGround(object, targetHeight) {
@@ -254,14 +266,16 @@ function applyChurchTransform(churchRoot) {
   churchRoot.visible = APPROVED_SEQUENCE_CONFIG.church.visible;
 }
 
-function getCropPlanes() {
-  const crop = APPROVED_SEQUENCE_CONFIG.environment.crop;
-  return [
-    new THREE.Plane(new THREE.Vector3(1, 0, 0), -crop.left),
-    new THREE.Plane(new THREE.Vector3(-1, 0, 0), crop.right),
-    new THREE.Plane(new THREE.Vector3(0, 0, 1), -crop.near),
-    new THREE.Plane(new THREE.Vector3(0, 0, -1), crop.far),
-  ];
+function applyGateDoorTransform(door) {
+  door.position.fromArray(GATE_DOOR_CONFIG.position);
+  door.rotation.set(...GATE_DOOR_CONFIG.rotation.map(degToRad));
+}
+
+function dampVector(current, target, damping, delta) {
+  current.x = THREE.MathUtils.damp(current.x, target.x, damping, delta);
+  current.y = THREE.MathUtils.damp(current.y, target.y, damping, delta);
+  current.z = THREE.MathUtils.damp(current.z, target.z, damping, delta);
+  return current;
 }
 
 function updateHeroOverlay(progress) {
@@ -323,10 +337,10 @@ function projectPageArea(id, config, opacity, camera, bookRig) {
   element.style.setProperty('--safe-rotation', `${rotation}rad`);
 }
 
-function updatePageOverlay(progress, camera, bookRig) {
+function updatePageOverlay(openProgress, camera, bookRig) {
   const overlay = document.getElementById('pageContentOverlay');
   if (!overlay || !bookRig) return;
-  const reveal = reducedMotion ? 1 : smoothstep(0.93, 1, progress);
+  const reveal = reducedMotion ? 1 : smoothstep(0.72, 1, openProgress);
   const opacity = reveal * APPROVED_SEQUENCE_CONFIG.overlays.opacity;
   overlay.style.setProperty('--page-overlay-opacity', String(opacity));
 
@@ -360,8 +374,7 @@ async function setupScene() {
   renderer.toneMappingExposure = LIGHTING_CONFIG.toneMappingExposure;
   renderer.shadowMap.enabled = !lowPowerViewport;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.localClippingEnabled = true;
-  renderer.clippingPlanes = getCropPlanes();
+  renderer.localClippingEnabled = false;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(LIGHTING_CONFIG.fog.color);
@@ -401,16 +414,25 @@ async function setupScene() {
   loader.setMeshoptDecoder(MeshoptDecoder);
 
   try {
-    const [churchGltf, lecternGltf, bookGltf] = await Promise.all([
+    const [doorGltf, churchGltf, lecternGltf, bookGltf] = await Promise.all([
+      loader.loadAsync(ASSETS.door),
       loader.loadAsync(ASSETS.church),
       loader.loadAsync(ASSETS.lectern),
       loader.loadAsync(ASSETS.book),
     ]);
 
+    const door = doorGltf.scene;
+    preserveModelMaterials(door);
+    normalizeToGround(door, GATE_DOOR_CONFIG.targetHeight);
+    applyGateDoorTransform(door);
+    scene.add(door);
+    const setDoorOpacity = createOpacityController(door);
+
     const churchRoot = churchGltf.scene;
     preserveModelMaterials(churchRoot);
     applyChurchTransform(churchRoot);
     scene.add(churchRoot);
+    const setChurchOpacity = createOpacityController(churchRoot);
 
     const altarRig = new THREE.Group();
     altarRig.name = 'ApprovedLecternBibleAltarRig';
@@ -455,7 +477,9 @@ async function setupScene() {
     const action = clip ? mixer.clipAction(clip) : null;
     if (action) {
       action.play();
-      action.paused = true;
+      action.paused = false;
+      action.enabled = true;
+      action.setEffectiveWeight(1);
     }
 
     setStatus('Church sequence loaded.', 'ready');
@@ -468,18 +492,42 @@ async function setupScene() {
       camera.updateProjectionMatrix();
     }
 
-    function updateScene(progress) {
+    const cameraTarget = initial.target.clone();
+    let renderedFov = initial.fov;
+    let renderedOpenProgress = reducedMotion ? 1 : 0;
+
+    function updateScene(progress, delta = 1 / 60, immediate = false) {
       const frame = getTimelineFrame(progress);
-      camera.position.copy(frame.position);
-      camera.fov = frame.fov;
-      camera.lookAt(frame.target);
+      if (immediate || reducedMotion) {
+        camera.position.copy(frame.position);
+        cameraTarget.copy(frame.target);
+        renderedFov = frame.fov;
+      } else {
+        dampVector(camera.position, frame.position, SMOOTHING_CONFIG.cameraDamping, delta);
+        dampVector(cameraTarget, frame.target, SMOOTHING_CONFIG.targetDamping, delta);
+        renderedFov = THREE.MathUtils.damp(renderedFov, frame.fov, SMOOTHING_CONFIG.fovDamping, delta);
+      }
+      camera.fov = renderedFov;
+      camera.lookAt(cameraTarget);
       camera.updateProjectionMatrix();
 
-      const openProgress = reducedMotion ? 1 : smoothstep(OPENING_CONFIG.scrollStart, OPENING_CONFIG.scrollEnd, progress);
+      const openGoal = reducedMotion ? 1 : smoothstep(OPENING_CONFIG.scrollStart, OPENING_CONFIG.scrollEnd, progress);
+      renderedOpenProgress = immediate || reducedMotion
+        ? openGoal
+        : THREE.MathUtils.damp(renderedOpenProgress, openGoal, SMOOTHING_CONFIG.animationDamping, delta);
       if (action && clip) {
-        mixer.setTime(openProgress * clip.duration * OPENING_CONFIG.clipTimeRatio);
+        action.paused = false;
+        action.enabled = true;
+        mixer.setTime(renderedOpenProgress * clip.duration * OPENING_CONFIG.clipTimeRatio);
         mixer.update(0);
       }
+
+      setDoorOpacity(1 - smoothstep(GATE_DOOR_CONFIG.fadeStart, GATE_DOOR_CONFIG.fadeEnd, progress));
+      setChurchOpacity(smoothstep(
+        GATE_DOOR_CONFIG.churchRevealStart,
+        GATE_DOOR_CONFIG.churchRevealEnd,
+        progress,
+      ));
 
       altarGlow.intensity = mix(
         LIGHTING_CONFIG.altarGlow.intensity,
@@ -487,7 +535,7 @@ async function setupScene() {
         smoothstep(0.72, 1, progress),
       );
       updateHeroOverlay(progress);
-      updatePageOverlay(progress, camera, bookRig);
+      updatePageOverlay(renderedOpenProgress, camera, bookRig);
     }
 
     let desiredProgress = scrollProgress();
@@ -498,8 +546,8 @@ async function setupScene() {
       const delta = Math.min(0.05, (now - last) / 1000);
       last = now;
       desiredProgress = scrollProgress();
-      renderedProgress = THREE.MathUtils.damp(renderedProgress, desiredProgress, reducedMotion ? 18 : 10, delta);
-      updateScene(renderedProgress);
+      renderedProgress = THREE.MathUtils.damp(renderedProgress, desiredProgress, reducedMotion ? 18 : SMOOTHING_CONFIG.scrollDamping, delta);
+      updateScene(renderedProgress, delta);
       renderer.render(scene, camera);
       requestAnimationFrame(render);
     }
@@ -509,7 +557,7 @@ async function setupScene() {
     window.addEventListener('scroll', () => {
       desiredProgress = scrollProgress();
     }, { passive: true });
-    updateScene(desiredProgress);
+    updateScene(desiredProgress, 1 / 60, true);
     requestAnimationFrame(render);
   } catch (error) {
     console.error(error);

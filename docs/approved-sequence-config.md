@@ -43,6 +43,22 @@ altar: {
 }
 ```
 
+## Gate Entry
+
+The public homepage now starts with the real optimized wooden church door model before the church interior is revealed:
+
+```js
+gateDoor: {
+  position: [1.2, -1.05, -1.48],
+  rotation: [0, 90, 0],
+  targetHeight: 3.9,
+  fadeStart: 0.08,
+  fadeEnd: 0.2,
+  churchRevealStart: 0.08,
+  churchRevealEnd: 0.18
+}
+```
+
 ## Church Framing
 
 ```js
@@ -65,7 +81,7 @@ environment: {
 }
 ```
 
-The church model is a single merged scan mesh, so the approved approach is camera framing, fog, darkness, crop planes, and viewport masking rather than deleting individual rooms.
+The church model is a single merged scan mesh, so the approved public approach is camera framing, fog, darkness, and the door-first reveal rather than deleting individual rooms. The homepage does not use clipping planes, which keeps the central altar and stained-glass window material visible.
 
 ## Approved Book Transform
 
@@ -86,6 +102,22 @@ opening: {
   clipTimeRatio: 0.5,
   scrollStart: 0.82,
   scrollEnd: 0.98
+}
+```
+
+The homepage drives the animated book with the same locked timing but keeps the action active while scrubbing, so the book opens in place instead of the page overlay appearing over a static closed cover.
+
+## Scroll Smoothing
+
+The public sequence uses requestAnimationFrame damping rather than direct scroll-to-camera jumps:
+
+```js
+smoothing: {
+  cameraDamping: 3.2,
+  targetDamping: 3.8,
+  fovDamping: 4.5,
+  animationDamping: 3.2,
+  scrollDamping: 6
 }
 ```
 

@@ -74,6 +74,15 @@ export const APPROVED_SEQUENCE_CONFIG = {
     rotation: [0, 0, 0],
     targetHeight: 2.05,
   },
+  gateDoor: {
+    position: [1.2, -1.05, -1.48],
+    rotation: [0, 90, 0],
+    targetHeight: 3.9,
+    fadeStart: 0.08,
+    fadeEnd: 0.2,
+    churchRevealStart: 0.08,
+    churchRevealEnd: 0.18,
+  },
   church: {
     position: [0, -0.2, 0],
     rotation: [0, 0, 0],
@@ -94,6 +103,13 @@ export const APPROVED_SEQUENCE_CONFIG = {
     clipTimeRatio: 0.5,
     scrollStart: 0.82,
     scrollEnd: 0.98,
+  },
+  smoothing: {
+    cameraDamping: 3.2,
+    targetDamping: 3.8,
+    fovDamping: 4.5,
+    animationDamping: 3.2,
+    scrollDamping: 6,
   },
   lighting: {
     toneMappingExposure: 1.05,
