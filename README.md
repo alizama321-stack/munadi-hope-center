@@ -62,6 +62,14 @@ The optimized GLBs use meshopt compression and WebP textures. The future Three.j
 
 ## Phase 2 Scene Blocking
 
+## Approved Homepage Sequence
+
+- The public homepage uses `APPROVED_SEQUENCE_CONFIG` from `src/approved-sequence-config.js`.
+- `/sequence-lab` is an archived calibration tool only. It may use `localStorage` for tuning, but the homepage must not depend on Sequence Lab `localStorage`.
+- When Sequence Lab values are approved, copy them into `src/approved-sequence-config.js`, then commit and push.
+- The visible Sequence Lab button `Copy approved config for homepage` copies a source-ready config object and prints it to the browser console.
+- Public homepage requirements: no sliders, no helper grids, no calibration panels, no debug labels, and no artificial floor/base platform.
+
 Current flow:
 
 1. Camera starts at the wooden church door.

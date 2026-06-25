@@ -23,13 +23,13 @@ No readable saved override was found in the local app/browser storage during thi
 
 | Preset | Position | Target | FOV |
 | --- | --- | --- | --- |
-| `gate_entry` | `[0, 1.95, 7.25]` | `[0, 2.1, 2.8]` | `50` |
-| `aisle_reveal` | `[0, 1.85, 4.65]` | `[0, 2.55, -3]` | `62` |
-| `aisle_walk_mid` | `[0, 1.88, 2.05]` | `[0, 2.35, -3.25]` | `48` |
-| `altar_approach` | `[0, 2.02, -0.75]` | `[0, 2.18, -3.5]` | `36` |
-| `lectern_end_point` | `[0, 2.18, -2]` | `[0, 2.16, -3.55]` | `30` |
-| `bible_closeup` | `[-0.12, 3.08, -3.04]` | `[0, 2.26, -3.55]` | `22` |
-| `bible_open_pages` | `[0, 3.18, -3.5]` | `[0, 2.18, -3.55]` | `24` |
+| `gate_entry` | `[-0.5, 0.3, -1.5]` | `[-29.1, -0.5, -1.65]` | `70` |
+| `aisle_reveal` | `[4.0724, 0.5425, -1.476]` | `[-29.1, -0.5, -1.65]` | `70` |
+| `aisle_walk_mid` | `[-0.65, 0.25, -0.95]` | `[-29.1, -0.5, -1.6]` | `70` |
+| `altar_approach` | `[-7.2, 0.85, -0.6]` | `[-4, -0.4, -3]` | `40` |
+| `lectern_end_point` | `[-12.85, 7.85, -2]` | `[-2.8, -2.35, -1.9]` | `34` |
+| `bible_closeup` | `[-12.85, 7.85, -2]` | `[-2.8, -2.35, -1.9]` | `34` |
+| `bible_open_pages` | `[-12.85, 7.85, -2]` | `[-2.8, -2.35, -1.9]` | `34` |
 
 ## Altar Rig
 
@@ -37,9 +37,9 @@ The approved lectern and Bible move together as one altar rig:
 
 ```js
 altar: {
-  position: [0, 0, -3.55],
-  rotation: [0, 180, 0],
-  scale: 1
+  position: [-5.45, -1.05, -1.6],
+  rotation: [0, 269, 0],
+  scale: 0.64
 }
 ```
 
