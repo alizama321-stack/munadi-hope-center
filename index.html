@@ -65,15 +65,127 @@
           </div>
 
           <div class="page-content-overlay" id="pageContentOverlay" aria-live="polite">
-            <article class="bible-page-test bible-page-left" id="homeLeftPageSafeArea">
-              <p class="eyebrow">Page test</p>
-              <h2>Hope begins here.</h2>
-              <p>This temporary HTML layer is positioned over the left Bible page. It will later hold the first story chapter.</p>
+            <article class="bible-page-surface bible-page-left" id="homeLeftPageSafeArea" aria-label="Left Bible page content">
+              <section class="bible-chapter is-active" data-chapter="0">
+                <p class="page-kicker">Welcome</p>
+                <h2>A Source of Hope, Peace &amp; Community</h2>
+                <p>Carrying a burden? Share what is on your heart. Every request is received with care and lifted in prayer.</p>
+                <div class="page-rule"></div>
+                <p class="scripture-note">Munadi Hope Center welcomes you into faith, prayer, and community.</p>
+              </section>
+
+              <section class="bible-chapter" data-chapter="1">
+                <p class="page-kicker">Leadership</p>
+                <h2>Our Pastor</h2>
+                <p>Pastor Rauf has been serving the community with a deep passion for spiritual growth, guidance, and restoration.</p>
+                <p>At Munadi Hope Center, he leads with vision and welcomes individuals from all walks of life.</p>
+              </section>
+
+              <section class="bible-chapter" data-chapter="2">
+                <p class="page-kicker">Prayer Request</p>
+                <h2>Connect With Us</h2>
+                <p>Send us a prayer request, feedback, or a question. We are listening, and we would be honored to pray with you.</p>
+                <ul class="page-list">
+                  <li>Prayer Request</li>
+                  <li>Pastoral Counseling</li>
+                  <li>Plan a Visit</li>
+                </ul>
+              </section>
+
+              <section class="bible-chapter" data-chapter="3">
+                <p class="page-kicker">Visit Us</p>
+                <h2>You are always welcome.</h2>
+                <p>Come pray with us in person, or reach out by phone. We would love to hear from you.</p>
+                <dl class="page-details">
+                  <div><dt>Service Hours</dt><dd>Sundays, 10:00 AM - 12:30 PM</dd></div>
+                  <div><dt>Phone</dt><dd><a href="tel:+923095514502">+92 309 5514502</a></dd></div>
+                </dl>
+              </section>
+
+              <section class="bible-chapter" data-chapter="4">
+                <p class="page-kicker">Location</p>
+                <h2>Find Munadi Hope Center</h2>
+                <p>House 14, Street 2, Sector G-6/4, Islamabad, Pakistan.</p>
+                <p>Use the map on the facing page to plan your visit.</p>
+              </section>
+
+              <section class="bible-chapter" data-chapter="5">
+                <p class="page-kicker">Final Invitation</p>
+                <h2>There is room for you here.</h2>
+                <p>Whether you need prayer, counsel, community, or a quiet place to begin again, Munadi Hope Center is ready to welcome you.</p>
+              </section>
             </article>
-            <article class="bible-page-test bible-page-right" id="homeRightPageSafeArea">
-              <p class="eyebrow">Invitation</p>
-              <h2>Come and see.</h2>
-              <p>This right page proves readable content can belong to the open book while remaining accessible HTML.</p>
+
+            <article class="bible-page-surface bible-page-right" id="homeRightPageSafeArea" aria-label="Right Bible page content">
+              <section class="bible-chapter is-active" data-chapter="0">
+                <p class="page-kicker">Invitation</p>
+                <h2>Step into a place of faith and welcome.</h2>
+                <p>The journey through the church opens into these pages as a simple invitation: come, pray, and be met with care.</p>
+                <a class="page-btn" href="#journey" data-scroll-end="true">Continue the Story</a>
+              </section>
+
+              <section class="bible-chapter" data-chapter="1">
+                <div class="pastor-mini">
+                  <span class="pastor-initials">PR</span>
+                  <div>
+                    <p class="page-kicker">Lead Pastor</p>
+                    <h2>Pastor Rauf</h2>
+                  </div>
+                </div>
+                <div class="page-stats">
+                  <span><strong>20+</strong> Years in Ministry</span>
+                  <span><strong>Daily</strong> Prayer Support</span>
+                  <span><strong>All</strong> Are Welcome</span>
+                </div>
+              </section>
+
+              <section class="bible-chapter" data-chapter="2">
+                <form class="page-form" id="contactForm" novalidate>
+                  <label>
+                    <span>Name</span>
+                    <input id="f-name" name="name" type="text" required autocomplete="name" />
+                  </label>
+                  <label>
+                    <span>Purpose / Topic</span>
+                    <select id="f-topic" name="topic" required>
+                      <option value="">Select a topic</option>
+                      <option>Prayer Request</option>
+                      <option>Pastoral Counseling</option>
+                      <option>Plan a Visit</option>
+                      <option>Share a Testimony</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Message / Prayer Request</span>
+                    <textarea id="f-message" name="message" rows="3" required></textarea>
+                  </label>
+                  <button type="submit" class="page-btn">Send Message</button>
+                  <p class="form-success" id="formSuccess">Thank you. Your message has been received.</p>
+                </form>
+              </section>
+
+              <section class="bible-chapter" data-chapter="3">
+                <p class="page-kicker">Plan a Visit</p>
+                <h2>Sunday worship</h2>
+                <dl class="page-details">
+                  <div><dt>Address</dt><dd>House 14, Street 2, Sector G-6/4, Islamabad, Pakistan</dd></div>
+                  <div><dt>Call</dt><dd><a href="tel:+923095514502">+92 309 5514502</a></dd></div>
+                </dl>
+                <a class="page-btn" href="https://wa.me/923095514502?text=Hello%20Pastor%20Rauf%2C%20I%20visited%20the%20Munadi%20Hope%20Center%20website..." target="_blank" rel="noopener">Chat with Pastor Rauf</a>
+              </section>
+
+              <section class="bible-chapter" data-chapter="4">
+                <div class="page-map">
+                  <iframe loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Map to Munadi Hope Center" src="https://www.google.com/maps?q=House+14+Street+2+Sector+G-6%2F4+Islamabad+Pakistan&output=embed"></iframe>
+                </div>
+              </section>
+
+              <section class="bible-chapter" data-chapter="5">
+                <p class="page-kicker">Contact</p>
+                <h2>Speak with us today.</h2>
+                <p>Message Pastor Rauf and the Munadi Hope Center team directly on WhatsApp.</p>
+                <a class="page-btn" href="https://wa.me/923095514502?text=Hello%20Pastor%20Rauf%2C%20I%20visited%20the%20Munadi%20Hope%20Center%20website..." target="_blank" rel="noopener">WhatsApp Us</a>
+              </section>
             </article>
           </div>
 

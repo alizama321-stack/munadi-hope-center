@@ -21,6 +21,12 @@ const OPENING_CONFIG = APPROVED_SEQUENCE_CONFIG.opening;
 const LIGHTING_CONFIG = APPROVED_SEQUENCE_CONFIG.lighting;
 const MATERIAL_CONFIG = APPROVED_SEQUENCE_CONFIG.materials;
 const SMOOTHING_CONFIG = APPROVED_SEQUENCE_CONFIG.smoothing;
+const CONTENT_CONFIG = APPROVED_SEQUENCE_CONFIG.content || {
+  start: 0.88,
+  end: 1,
+  pageCoverStart: 0.76,
+  pageCoverEnd: 0.94,
+};
 const timeline = [
   { at: 0, key: 'gate_entry' },
   { at: 0.16, key: 'aisle_reveal' },
@@ -28,7 +34,8 @@ const timeline = [
   { at: 0.58, key: 'altar_approach' },
   { at: 0.72, key: 'lectern_end_point' },
   { at: 0.86, key: 'bible_closeup' },
-  { at: 1, key: 'bible_open_pages' },
+  { at: 0.94, key: 'bible_open_pages' },
+  { at: 1, key: 'bible_content_view' },
 ];
 
 function clamp(value, min = 0, max = 1) {
@@ -220,6 +227,111 @@ function createCoverTexture() {
   return texture;
 }
 
+function createPageTexture(seed = 0) {
+  const size = 768;
+  const canvasTexture = document.createElement('canvas');
+  canvasTexture.width = size;
+  canvasTexture.height = size;
+  const ctx = canvasTexture.getContext('2d');
+  const gradient = ctx.createLinearGradient(0, 0, size, size);
+  gradient.addColorStop(0, '#f8ebcb');
+  gradient.addColorStop(0.45, '#ead3a3');
+  gradient.addColorStop(1, '#f6e7c4');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+
+  let value = seed + 41;
+  const rand = () => {
+    value = (value * 1664525 + 1013904223) % 4294967296;
+    return value / 4294967296;
+  };
+
+  for (let i = 0; i < 2200; i += 1) {
+    const alpha = rand() * 0.07;
+    ctx.fillStyle = `rgba(95, 54, 26, ${alpha})`;
+    ctx.fillRect(rand() * size, rand() * size, rand() * 2.2 + 0.4, rand() * 2.2 + 0.4);
+  }
+
+  ctx.strokeStyle = 'rgba(149, 95, 38, 0.16)';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(36, 38, size - 72, size - 76);
+  ctx.strokeStyle = 'rgba(255, 250, 229, 0.32)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(54, 56, size - 108, size - 112);
+
+  const texture = new THREE.CanvasTexture(canvasTexture);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function createReadablePageSpread() {
+  const group = new THREE.Group();
+  group.name = 'HomepageReadableBiblePages';
+  group.visible = false;
+  group.position.set(0, -0.41, 0.012);
+
+  const pageShape = new THREE.Shape();
+  const width = 1.86;
+  const height = 2.16;
+  const radius = 0.045;
+  pageShape.moveTo(-width / 2 + radius, -height / 2);
+  pageShape.lineTo(width / 2 - radius, -height / 2);
+  pageShape.quadraticCurveTo(width / 2, -height / 2, width / 2, -height / 2 + radius);
+  pageShape.lineTo(width / 2, height / 2 - radius);
+  pageShape.quadraticCurveTo(width / 2, height / 2, width / 2 - radius, height / 2);
+  pageShape.lineTo(-width / 2 + radius, height / 2);
+  pageShape.quadraticCurveTo(-width / 2, height / 2, -width / 2, height / 2 - radius);
+  pageShape.lineTo(-width / 2, -height / 2 + radius);
+  pageShape.quadraticCurveTo(-width / 2, -height / 2, -width / 2 + radius, -height / 2);
+
+  const geometry = new THREE.ShapeGeometry(pageShape, 20);
+  const makeMaterial = (seed) => new THREE.MeshStandardMaterial({
+    map: createPageTexture(seed),
+    color: '#f2dfb6',
+    roughness: 0.96,
+    metalness: 0,
+    transparent: true,
+    opacity: 0,
+    depthTest: false,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+
+  const leftPage = new THREE.Mesh(geometry, makeMaterial(11));
+  leftPage.name = 'HomepageLeftReadablePage';
+  leftPage.position.set(-0.93, 0, 0);
+  leftPage.rotation.x = -Math.PI / 2;
+  leftPage.receiveShadow = true;
+  leftPage.renderOrder = 30;
+
+  const rightPage = new THREE.Mesh(geometry.clone(), makeMaterial(29));
+  rightPage.name = 'HomepageRightReadablePage';
+  rightPage.position.set(0.93, 0, 0);
+  rightPage.rotation.x = -Math.PI / 2;
+  rightPage.receiveShadow = true;
+  rightPage.renderOrder = 30;
+
+  const crease = new THREE.Mesh(
+    new THREE.BoxGeometry(0.035, 0.018, 2.16),
+    new THREE.MeshStandardMaterial({
+      color: '#9b6739',
+      roughness: 0.92,
+      transparent: true,
+      opacity: 0,
+      depthTest: false,
+      depthWrite: false,
+    }),
+  );
+  crease.name = 'HomepageReadablePageCrease';
+  crease.position.set(0, 0.012, 0);
+  crease.renderOrder = 31;
+
+  group.add(leftPage, rightPage, crease);
+  return group;
+}
+
 function getDecalPlacement(coverNode, face) {
   const isRightCover = coverNode.name.includes('cover-r');
   return {
@@ -337,16 +449,52 @@ function projectPageArea(id, config, opacity, camera, bookRig) {
   element.style.setProperty('--safe-rotation', `${rotation}rad`);
 }
 
-function updatePageOverlay(openProgress, camera, bookRig) {
+function updatePageOverlay(progress, openProgress, camera, bookRig) {
   const overlay = document.getElementById('pageContentOverlay');
   if (!overlay || !bookRig) return;
-  const reveal = reducedMotion ? 1 : smoothstep(0.72, 1, openProgress);
+  const reveal = reducedMotion
+    ? 1
+    : Math.max(smoothstep(0.72, 1, openProgress), smoothstep(CONTENT_CONFIG.start, CONTENT_CONFIG.start + 0.035, progress));
   const opacity = reveal * APPROVED_SEQUENCE_CONFIG.overlays.opacity;
   overlay.style.setProperty('--page-overlay-opacity', String(opacity));
+  overlay.classList.toggle('is-readable', opacity > 0.45);
 
   if (lowPowerViewport) return;
   projectPageArea('homeLeftPageSafeArea', APPROVED_SEQUENCE_CONFIG.overlays.left, opacity, camera, bookRig);
   projectPageArea('homeRightPageSafeArea', APPROVED_SEQUENCE_CONFIG.overlays.right, opacity, camera, bookRig);
+}
+
+function updateReadablePageSpread(pageSpread, opacity) {
+  if (!pageSpread) return;
+  const nextOpacity = clamp(opacity);
+  pageSpread.visible = nextOpacity > 0.01;
+  pageSpread.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+    child.material.opacity = child.name === 'HomepageReadablePageCrease'
+      ? nextOpacity * 0.32
+      : nextOpacity * 0.96;
+    child.material.needsUpdate = true;
+  });
+}
+
+function updateBibleChapters(progress, openProgress) {
+  const chapters = [...document.querySelectorAll('.bible-chapter')];
+  if (!chapters.length) return;
+  const openReveal = reducedMotion
+    ? 1
+    : Math.max(smoothstep(0.74, 1, openProgress), smoothstep(CONTENT_CONFIG.start, CONTENT_CONFIG.start + 0.035, progress));
+  const contentProgress = reducedMotion ? 1 : smoothstep(CONTENT_CONFIG.start, CONTENT_CONFIG.end, progress);
+  const chapterCount = Math.max(1, Math.max(...chapters.map((chapter) => Number(chapter.dataset.chapter || 0))) + 1);
+  const chapterCursor = contentProgress * Math.max(1, chapterCount - 1);
+
+  chapters.forEach((chapter) => {
+    const index = Number(chapter.dataset.chapter || 0);
+    const chapterOpacity = clamp(1 - Math.abs(chapterCursor - index), 0, 1) * openReveal;
+    chapter.style.setProperty('--chapter-opacity', chapterOpacity.toFixed(3));
+    chapter.style.setProperty('--chapter-shift', `${((index - chapterCursor) * 12).toFixed(1)}px`);
+    chapter.classList.toggle('is-active', chapterOpacity > 0.45);
+    chapter.setAttribute('aria-hidden', chapterOpacity > 0.12 ? 'false' : 'true');
+  });
 }
 
 function scrollProgress() {
@@ -455,6 +603,9 @@ async function setupScene() {
     preserveModelMaterials(animatedBook);
     bookRig.add(animatedBook);
 
+    const pageSpread = createReadablePageSpread();
+    bookRig.add(pageSpread);
+
     const decal = new THREE.Mesh(
       new THREE.PlaneGeometry(1, 1),
       new THREE.MeshStandardMaterial({
@@ -521,6 +672,10 @@ async function setupScene() {
         mixer.setTime(renderedOpenProgress * clip.duration * OPENING_CONFIG.clipTimeRatio);
         mixer.update(0);
       }
+      decal.material.opacity = MATERIAL_CONFIG.coverDecal.opacity * (1 - smoothstep(0.62, 0.88, renderedOpenProgress));
+      decal.material.needsUpdate = true;
+      const pageCoverOpacity = smoothstep(CONTENT_CONFIG.pageCoverStart, CONTENT_CONFIG.pageCoverEnd, progress);
+      updateReadablePageSpread(pageSpread, pageCoverOpacity);
 
       setDoorOpacity(1 - smoothstep(GATE_DOOR_CONFIG.fadeStart, GATE_DOOR_CONFIG.fadeEnd, progress));
       setChurchOpacity(smoothstep(
@@ -535,7 +690,8 @@ async function setupScene() {
         smoothstep(0.72, 1, progress),
       );
       updateHeroOverlay(progress);
-      updatePageOverlay(renderedOpenProgress, camera, bookRig);
+      updatePageOverlay(progress, renderedOpenProgress, camera, bookRig);
+      updateBibleChapters(progress, renderedOpenProgress);
     }
 
     let desiredProgress = scrollProgress();
@@ -604,8 +760,21 @@ function setupAnchorNavigation() {
   });
 }
 
+function setupBiblePageForm() {
+  const form = document.getElementById('contactForm');
+  const success = document.getElementById('formSuccess');
+  if (!form || !success) return;
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    success.classList.add('is-visible');
+    form.reset();
+  });
+}
+
 document.documentElement.style.scrollBehavior = reducedMotion ? 'auto' : 'smooth';
 
 setupScene();
 setupNavSpy();
 setupAnchorNavigation();
+setupBiblePageForm();

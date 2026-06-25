@@ -62,6 +62,12 @@ export const APPROVED_SEQUENCE_CONFIG = {
         fov: 34,
         distance: 0.34,
       },
+      bible_content_view: {
+        position: [-12.85, 7.85, -2],
+        target: [-2.8, -2.35, -1.9],
+        fov: 34,
+        distance: 0.34,
+      },
     },
   },
   altar: {
@@ -149,17 +155,23 @@ export const APPROVED_SEQUENCE_CONFIG = {
     },
   },
   overlays: {
-    opacity: 0.86,
-    borderVisible: true,
+    opacity: 1,
+    borderVisible: false,
     left: {
-      position: [-0.92, -0.46, -0.08],
+      position: [-0.9, -0.46, -0.08],
       rotation: [0, 0, 0],
-      scale: [1.18, 0.84],
+      scale: [1.72, 1.62],
     },
     right: {
-      position: [0.55, -0.46, -0.03],
+      position: [0.5, -0.46, -0.03],
       rotation: [0, 0, 0],
-      scale: [1.2, 0.84],
+      scale: [1.64, 1.62],
     },
+  },
+  content: {
+    start: 0.9,
+    end: 1,
+    pageCoverStart: 0.82,
+    pageCoverEnd: 0.96,
   },
 };
