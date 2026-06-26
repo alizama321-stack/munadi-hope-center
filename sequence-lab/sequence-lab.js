@@ -29,6 +29,7 @@ const PRESET_LABELS = {
   lectern_end_point: 'Lectern End Point',
   bible_closeup: 'Bible Closeup',
   bible_open_pages: 'Open Bible Pages',
+  bible_content_fullscreen: 'Bible Content Fullscreen',
 };
 
 const HUMAN_AXIS_LABELS = {
@@ -49,11 +50,42 @@ const HUMAN_AXIS_LABELS = {
   },
 };
 
-const BOOK_LAB_DEFAULT_SEQUENCE = APPROVED_SEQUENCE_CONFIG;
-
 function cloneConfig(value) {
   return JSON.parse(JSON.stringify(value));
 }
+
+function createSequenceLabDefaultSequence() {
+  const defaults = cloneConfig(APPROVED_SEQUENCE_CONFIG);
+  defaults.camera = defaults.camera || {};
+  defaults.camera.presets = defaults.camera.presets || {};
+  defaults.camera.presets.bible_content_fullscreen = defaults.camera.presets.bible_content_fullscreen || {
+    position: [-12.85, 10.5, -2],
+    target: [-2.8, -2.35, -1.9],
+    fov: 26,
+    distance: 0.32,
+  };
+  defaults.overlays = defaults.overlays || {};
+  defaults.overlays.opacity = defaults.overlays.opacity ?? 1;
+  defaults.overlays.borderVisible = defaults.overlays.borderVisible ?? false;
+  defaults.overlays.padding = defaults.overlays.padding ?? 0.75;
+  defaults.overlays.finalFrameRotation = defaults.overlays.finalFrameRotation ?? 0;
+  defaults.overlays.pageTextSuppression = defaults.overlays.pageTextSuppression ?? 0.92;
+  defaults.overlays.left = {
+    ...(defaults.overlays.left || {}),
+    position: [-0.92, -0.46, -0.08],
+    rotation: [0, 0, 0],
+    scale: [1.92, 1.78],
+  };
+  defaults.overlays.right = {
+    ...(defaults.overlays.right || {}),
+    position: [0.56, -0.46, -0.03],
+    rotation: [0, 0, 0],
+    scale: [1.86, 1.78],
+  };
+  return defaults;
+}
+
+const BOOK_LAB_DEFAULT_SEQUENCE = createSequenceLabDefaultSequence();
 
 function normalizeTransforms(value = {}) {
   const source = value || {};
@@ -134,7 +166,7 @@ function normalizeSequenceConfig(value = {}) {
   const normalizePreset = (key, legacyKeys = []) => {
     const legacyList = Array.isArray(legacyKeys) ? legacyKeys : [legacyKeys];
     const preset = presetSource[key] || legacyList.map((legacyKey) => presetSource[legacyKey] || camera[legacyKey]).find(Boolean) || {};
-    const fallback = defaults.camera.presets[key];
+    const fallback = defaults.camera.presets[key] || defaults.camera.presets.bible_content_view || defaults.camera.presets.bible_open_pages;
     return {
       position: [...(preset.position || fallback.position)],
       target: [...(preset.target || fallback.target)],
@@ -154,6 +186,7 @@ function normalizeSequenceConfig(value = {}) {
         lectern_end_point: normalizePreset('lectern_end_point', ['altar', 'bible', 'pages']),
         bible_closeup: normalizePreset('bible_closeup', ['bible', 'cover']),
         bible_open_pages: normalizePreset('bible_open_pages', ['pages']),
+        bible_content_fullscreen: normalizePreset('bible_content_fullscreen', ['bible_content_view', 'content_fullscreen', 'content', 'pages']),
       },
     },
     altar: {
@@ -180,6 +213,9 @@ function normalizeSequenceConfig(value = {}) {
     overlays: {
       opacity: Number(overlays.opacity ?? defaults.overlays.opacity),
       borderVisible: Boolean(overlays.borderVisible ?? defaults.overlays.borderVisible),
+      padding: Number(overlays.padding ?? defaults.overlays.padding ?? 0.75),
+      finalFrameRotation: Number(overlays.finalFrameRotation ?? defaults.overlays.finalFrameRotation ?? 0),
+      pageTextSuppression: Number(overlays.pageTextSuppression ?? defaults.overlays.pageTextSuppression ?? 0.92),
       left: {
         position: [...(left.position || defaults.overlays.left.position)],
         rotation: [...(left.rotation || defaults.overlays.left.rotation)],
@@ -242,6 +278,9 @@ function getSequenceConfigForExport() {
     overlays: {
       opacity: Number(sequenceState.overlays.opacity.toFixed(4)),
       borderVisible: sequenceState.overlays.borderVisible,
+      padding: Number(sequenceState.overlays.padding.toFixed(4)),
+      finalFrameRotation: Number(sequenceState.overlays.finalFrameRotation.toFixed(4)),
+      pageTextSuppression: Number(sequenceState.overlays.pageTextSuppression.toFixed(4)),
       left: {
         position: toFixedArray(sequenceState.overlays.left.position),
         rotation: toFixedArray(sequenceState.overlays.left.rotation),
@@ -717,12 +756,14 @@ function getCameraKey(presetName) {
   if (presetName === 'lectern_end_point') return 'lectern_end_point';
   if (presetName === 'bible_closeup') return 'bible_closeup';
   if (presetName === 'bible_open_pages') return 'bible_open_pages';
+  if (presetName === 'bible_content_fullscreen') return 'bible_content_fullscreen';
   if (presetName === 'entrance' || presetName === 'hero_view' || presetName === 'hero') return 'gate_entry';
   if (presetName === 'aisle') return 'aisle_reveal';
   if (presetName === 'stage' || presetName === 'cover_closeup' || presetName === 'cover') return 'altar_approach';
   if (presetName === 'altar') return 'lectern_end_point';
   if (presetName === 'bible') return 'bible_closeup';
   if (presetName === 'open_pages_view' || presetName === 'open_pages_fullscreen' || presetName === 'pages') return 'bible_open_pages';
+  if (presetName === 'bible_content_view' || presetName === 'content_fullscreen' || presetName === 'content') return 'bible_content_fullscreen';
   return 'gate_entry';
 }
 
@@ -784,8 +825,11 @@ function setSequenceProgress(value) {
     mixPreset('altar_approach', 'lectern_end_point', (progress - 0.58) / 0.14);
   } else if (progress < 0.86) {
     mixPreset('lectern_end_point', 'bible_closeup', (progress - 0.72) / 0.14);
+  } else if (progress < 0.94) {
+    mixPreset('bible_closeup', 'bible_open_pages', (progress - 0.86) / 0.08);
+    openProgress = smoothstep((progress - 0.82) / 0.16);
   } else {
-    mixPreset('bible_closeup', 'bible_open_pages', (progress - 0.86) / 0.14);
+    mixPreset('bible_open_pages', 'bible_content_fullscreen', (progress - 0.94) / 0.06);
     openProgress = smoothstep((progress - 0.82) / 0.16);
   }
 
@@ -807,7 +851,8 @@ function updatePageSpread(opacity = smoothstep((currentOpenProgress - 0.8) / 0.2
   pageSpread.visible = opacity > 0.01;
   pageSpread.traverse((child) => {
     if (!child.isMesh || !child.material) return;
-    child.material.opacity = child.name === 'BookLabPageCrease' ? opacity * 0.36 : opacity * 0.78;
+    const pageSuppression = THREE.MathUtils.clamp(sequenceState.overlays.pageTextSuppression, 0, 1);
+    child.material.opacity = child.name === 'BookLabPageCrease' ? opacity * 0.36 : opacity * pageSuppression;
     child.material.needsUpdate = true;
   });
 }
@@ -838,6 +883,17 @@ function getAxisIndex(axis) {
 function getSequenceValue(path) {
   const parts = path.split('.');
   if (parts[0] === 'progress') return sequenceState.progress;
+
+  if (parts[0] === 'content') {
+    if (parts[1] === 'width') return Number(((sequenceState.overlays.left.scale[0] + sequenceState.overlays.right.scale[0]) / 2).toFixed(4));
+    if (parts[1] === 'height') return Number(((sequenceState.overlays.left.scale[1] + sequenceState.overlays.right.scale[1]) / 2).toFixed(4));
+    if (parts[1] === 'moveX') return Number(((sequenceState.overlays.left.position[0] + sequenceState.overlays.right.position[0]) / 2).toFixed(4));
+    if (parts[1] === 'moveY') return Number(((sequenceState.overlays.left.position[1] + sequenceState.overlays.right.position[1]) / 2).toFixed(4));
+    if (parts[1] === 'opacity') return sequenceState.overlays.opacity;
+    if (parts[1] === 'padding') return sequenceState.overlays.padding;
+    if (parts[1] === 'rotation') return sequenceState.overlays.finalFrameRotation;
+    if (parts[1] === 'pageTextSuppression') return sequenceState.overlays.pageTextSuppression;
+  }
 
   if (parts[0] === 'camera') {
     const presetKey = parts[1];
@@ -880,6 +936,37 @@ function setSequenceValue(path, rawValue, isChecked = false) {
   const parts = path.split('.');
   if (parts[0] === 'progress') {
     setSequenceProgress(rawValue);
+    return;
+  }
+
+  if (parts[0] === 'content') {
+    const value = Number(rawValue);
+    if (parts[1] === 'width') {
+      sequenceState.overlays.left.scale[0] = value;
+      sequenceState.overlays.right.scale[0] = value;
+    } else if (parts[1] === 'height') {
+      sequenceState.overlays.left.scale[1] = value;
+      sequenceState.overlays.right.scale[1] = value;
+    } else if (parts[1] === 'moveX') {
+      const currentCenter = (sequenceState.overlays.left.position[0] + sequenceState.overlays.right.position[0]) / 2;
+      const delta = value - currentCenter;
+      sequenceState.overlays.left.position[0] += delta;
+      sequenceState.overlays.right.position[0] += delta;
+    } else if (parts[1] === 'moveY') {
+      sequenceState.overlays.left.position[1] = value;
+      sequenceState.overlays.right.position[1] = value;
+    } else if (parts[1] === 'opacity') {
+      sequenceState.overlays.opacity = value;
+    } else if (parts[1] === 'padding') {
+      sequenceState.overlays.padding = value;
+    } else if (parts[1] === 'rotation') {
+      sequenceState.overlays.finalFrameRotation = value;
+    } else if (parts[1] === 'pageTextSuppression') {
+      sequenceState.overlays.pageTextSuppression = value;
+      updatePageSpread();
+    }
+    updatePageOverlay();
+    syncSequenceInputs();
     return;
   }
 
@@ -935,6 +1022,9 @@ function setSequenceValue(path, rawValue, isChecked = false) {
       sequenceState.overlays.borderVisible = isChecked;
     } else if (parts[1] === 'opacity') {
       sequenceState.overlays.opacity = Number(rawValue);
+    } else if (parts[1] === 'padding' || parts[1] === 'finalFrameRotation' || parts[1] === 'pageTextSuppression') {
+      sequenceState.overlays[parts[1]] = Number(rawValue);
+      if (parts[1] === 'pageTextSuppression') updatePageSpread();
     } else {
       const side = parts[1];
       const prop = parts[2];
@@ -943,6 +1033,7 @@ function setSequenceValue(path, rawValue, isChecked = false) {
       sequenceState.overlays[side][prop][axisIndex] = Number(rawValue);
     }
     updatePageOverlay();
+    syncSequenceInputs();
   }
 }
 
@@ -1044,7 +1135,8 @@ function setupControls() {
           altar_approach: 0.58,
           lectern_end_point: 0.72,
           bible_closeup: 0.86,
-          bible_open_pages: 1,
+          bible_open_pages: 0.94,
+          bible_content_fullscreen: 1,
         }[getCameraKey(preset)] ?? 0;
         sequenceInput.value = String(sequenceState.progress);
       }
@@ -1092,6 +1184,9 @@ function setupControls() {
   document.getElementById('copyHomepageConfig').addEventListener('click', copyApprovedConfigForHomepage);
   document.getElementById('exportApprovedConfig').addEventListener('click', exportApprovedConfig);
   document.getElementById('applyApprovedConfig').addEventListener('click', applyApprovedConfig);
+  document.getElementById('saveFinalBibleContentView').addEventListener('click', saveFinalBibleContentView);
+  document.getElementById('printFinalBibleContentConfig').addEventListener('click', printFinalBibleContentConfig);
+  document.getElementById('applyFinalBibleContentConfig').addEventListener('click', applyFinalBibleContentConfigToHomepage);
   document.getElementById('printSequence').addEventListener('click', printSequenceConfig);
   document.getElementById('saveSequence').addEventListener('click', saveCurrentSequence);
   document.getElementById('resetSequence').addEventListener('click', resetSequenceConfig);
@@ -1147,6 +1242,56 @@ function printSequenceConfig() {
   const configText = `const SEQUENCE_LAB_DEFAULT_SEQUENCE = ${JSON.stringify(getSequenceConfigForExport(), null, 2)};`;
   console.info('[SequenceLab] final sequence config\n%s', configText);
   setStatus('Printed final sequence config to console.');
+}
+
+function getFinalBibleContentConfig() {
+  return {
+    camera: {
+      bible_content_fullscreen: {
+        position: toFixedArray(sequenceState.camera.presets.bible_content_fullscreen.position),
+        target: toFixedArray(sequenceState.camera.presets.bible_content_fullscreen.target),
+        fov: Number(sequenceState.camera.presets.bible_content_fullscreen.fov.toFixed(4)),
+        distance: Number(sequenceState.camera.presets.bible_content_fullscreen.distance.toFixed(4)),
+      },
+    },
+    overlays: {
+      opacity: Number(sequenceState.overlays.opacity.toFixed(4)),
+      borderVisible: sequenceState.overlays.borderVisible,
+      padding: Number(sequenceState.overlays.padding.toFixed(4)),
+      finalFrameRotation: Number(sequenceState.overlays.finalFrameRotation.toFixed(4)),
+      pageTextSuppression: Number(sequenceState.overlays.pageTextSuppression.toFixed(4)),
+      left: {
+        position: toFixedArray(sequenceState.overlays.left.position),
+        rotation: toFixedArray(sequenceState.overlays.left.rotation),
+        scale: toFixedArray(sequenceState.overlays.left.scale),
+      },
+      right: {
+        position: toFixedArray(sequenceState.overlays.right.position),
+        rotation: toFixedArray(sequenceState.overlays.right.rotation),
+        scale: toFixedArray(sequenceState.overlays.right.scale),
+      },
+    },
+  };
+}
+
+function saveFinalBibleContentView() {
+  sequenceState.camera.presets.bible_content_fullscreen = {
+    position: toFixedArray(camera.position.toArray()),
+    target: toFixedArray(controls.target.toArray()),
+    fov: Number(camera.fov.toFixed(4)),
+    distance: 1,
+  };
+  sequenceState.progress = 1;
+  persistSequenceConfig();
+  syncSequenceInputs();
+  printFinalBibleContentConfig();
+  setStatus('Saved the current camera as the final Bible content view.');
+}
+
+function printFinalBibleContentConfig() {
+  const configText = `const FINAL_BIBLE_CONTENT_CONFIG = ${JSON.stringify(getFinalBibleContentConfig(), null, 2)};`;
+  console.info('[SequenceLab] final Bible content config\n%s', configText);
+  setStatus('Printed final Bible content config to console.');
 }
 
 function getApprovedHomepageConfigFromLabState() {
@@ -1208,6 +1353,23 @@ async function copyApprovedConfigForHomepage() {
   } catch (error) {
     console.warn('[SequenceLab] Clipboard copy failed; config was printed to console.', error);
     setStatus('Clipboard blocked. Approved homepage config was printed to console.');
+  }
+}
+
+async function applyFinalBibleContentConfigToHomepage() {
+  const config = getApprovedHomepageConfigFromLabState();
+  const finalContent = getFinalBibleContentConfig();
+  config.camera.presets.bible_content_view = structuredClone(finalContent.camera.bible_content_fullscreen);
+  config.camera.presets.bible_content_fullscreen = structuredClone(finalContent.camera.bible_content_fullscreen);
+  config.overlays = structuredClone(finalContent.overlays);
+  const configText = `export const APPROVED_SEQUENCE_CONFIG = ${JSON.stringify(config, null, 2)};`;
+  console.info('[SequenceLab] homepage-ready config with final Bible content view\n%s', configText);
+  try {
+    await navigator.clipboard.writeText(configText);
+    setStatus('Copied homepage-ready config with the final Bible content view. Source files are not changed by the lab button.');
+  } catch (error) {
+    console.warn('[SequenceLab] Clipboard copy failed; homepage-ready config was printed to console.', error);
+    setStatus('Clipboard blocked. Homepage-ready final Bible content config was printed to console.');
   }
 }
 
@@ -1281,6 +1443,8 @@ function positionPageSafeArea(id, config, opacity) {
 
   element.style.setProperty('--page-overlay-opacity', opacity.toFixed(3));
   element.style.setProperty('--safe-border-opacity', sequenceState.overlays.borderVisible ? '0.2' : '0');
+  element.style.setProperty('--page-content-padding', `${sequenceState.overlays.padding.toFixed(3)}rem`);
+  element.style.setProperty('--page-guide-opacity', sequenceState.overlays.borderVisible ? '0.32' : '0.11');
 
   if (opacity <= 0.001) return;
 
@@ -1315,12 +1479,12 @@ function positionPageSafeArea(id, config, opacity) {
   const centerY = screen.reduce((sum, point) => sum + point.y, 0) / screen.length;
   const screenWidth = Math.hypot(screen[1].x - screen[0].x, screen[1].y - screen[0].y);
   const screenHeight = Math.hypot(screen[2].x - screen[0].x, screen[2].y - screen[0].y);
-  const rotation = Math.atan2(screen[1].y - screen[0].y, screen[1].x - screen[0].x);
+  const rotation = Math.atan2(screen[1].y - screen[0].y, screen[1].x - screen[0].x) + degToRad(sequenceState.overlays.finalFrameRotation);
 
   element.style.setProperty('--safe-left', `${centerX}px`);
   element.style.setProperty('--safe-top', `${centerY}px`);
-  element.style.setProperty('--safe-width', `${THREE.MathUtils.clamp(screenWidth, 120, window.innerWidth * 0.72)}px`);
-  element.style.setProperty('--safe-height', `${THREE.MathUtils.clamp(screenHeight, 80, window.innerHeight * 0.52)}px`);
+  element.style.setProperty('--safe-width', `${THREE.MathUtils.clamp(screenWidth, 160, window.innerWidth * 0.9)}px`);
+  element.style.setProperty('--safe-height', `${THREE.MathUtils.clamp(screenHeight, 100, window.innerHeight * 0.78)}px`);
   element.style.setProperty('--safe-rotation', `${rotation}rad`);
   element.style.setProperty('--safe-scale', '1');
 }

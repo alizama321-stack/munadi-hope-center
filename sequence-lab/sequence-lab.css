@@ -215,16 +215,20 @@ select:disabled {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: clamp(0.7rem, 1.5vw, 1.15rem);
-  border: 1px solid rgba(92, 58, 25, var(--safe-border-opacity, 0.18));
-  border-radius: 6px;
+  padding: var(--page-content-padding, clamp(0.7rem, 1.5vw, 1.15rem));
+  border: 1px solid rgba(116, 78, 35, var(--safe-border-opacity, 0));
+  border-radius: 5px;
   background:
-    radial-gradient(circle at 20% 10%, rgba(255, 252, 231, 0.2), transparent 42%),
-    linear-gradient(135deg, rgba(255, 247, 219, 0.18), rgba(230, 194, 121, 0.08));
+    radial-gradient(circle at 18% 8%, rgba(255, 252, 231, 0.34), transparent 44%),
+    radial-gradient(circle at 74% 88%, rgba(173, 114, 47, 0.16), transparent 48%),
+    linear-gradient(135deg, rgba(255, 247, 219, 0.34), rgba(230, 194, 121, 0.18));
   box-shadow:
-    inset 0 0 34px rgba(97, 58, 18, 0.08),
-    inset 0 1px 0 rgba(255, 252, 231, 0.18);
+    inset 0 0 38px rgba(97, 58, 18, 0.11),
+    inset 0 1px 0 rgba(255, 252, 231, 0.22),
+    0 8px 24px rgba(55, 29, 7, 0.08);
   opacity: var(--page-overlay-opacity, 0);
+  mix-blend-mode: multiply;
+  backdrop-filter: blur(0.4px);
   transform:
     translate3d(-50%, -50%, 0)
     rotate(var(--safe-rotation, 0deg))
@@ -235,17 +239,17 @@ select:disabled {
 .page-safe-area::before {
   content: "";
   position: absolute;
-  inset: 0.45rem;
+  inset: max(0.45rem, calc(var(--page-content-padding, 0.75rem) * 0.55));
   border-radius: 4px;
   background-image:
     repeating-linear-gradient(
       to bottom,
-      rgba(101, 69, 31, 0.12) 0,
-      rgba(101, 69, 31, 0.12) 1px,
+      rgba(101, 69, 31, 0.09) 0,
+      rgba(101, 69, 31, 0.09) 1px,
       transparent 1px,
-      transparent 18px
+      transparent 20px
     );
-  opacity: 0.3;
+  opacity: var(--page-guide-opacity, 0.11);
 }
 
 .page-text {
@@ -255,7 +259,7 @@ select:disabled {
   font-family: "Cormorant Garamond", serif;
   font-size: clamp(1rem, 1.55vw, 1.45rem);
   font-weight: 700;
-  line-height: 1.05;
+  line-height: 1.12;
   text-align: center;
   text-shadow: 0 1px 0 rgba(255, 248, 232, 0.42);
 }
