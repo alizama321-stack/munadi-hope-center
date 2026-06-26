@@ -114,51 +114,37 @@
           <label>Crop Far <input data-seq="environment.crop.far" type="number" step="0.1" /></label>
           <label>Show Church <input data-seq="church.visible" type="checkbox" /></label>
 
-          <div class="control-section">
-            <p class="section-title">Page Overlay Controls</p>
-            <p class="section-help">Page overlays = where website content will sit later.</p>
-          </div>
-
-          <label>Left Page Move Left / Right <input data-seq="overlays.left.position.x" type="number" step="0.01" /></label>
-          <label>Left Page Move Higher / Lower <input data-seq="overlays.left.position.y" type="number" step="0.01" /></label>
-          <label>Left Page Move Forward / Back <input data-seq="overlays.left.position.z" type="number" step="0.01" /></label>
-          <label>Left Page Tilt Up / Down <input data-seq="overlays.left.rotation.x" type="number" step="1" /></label>
-          <label>Left Page Turn Left / Right <input data-seq="overlays.left.rotation.y" type="number" step="1" /></label>
-          <label>Left Page Lean Sideways <input data-seq="overlays.left.rotation.z" type="number" step="1" /></label>
-          <label>Left Page Width <input data-seq="overlays.left.scale.x" type="number" step="0.01" /></label>
-          <label>Left Page Height <input data-seq="overlays.left.scale.y" type="number" step="0.01" /></label>
-
-          <label>Right Page Move Left / Right <input data-seq="overlays.right.position.x" type="number" step="0.01" /></label>
-          <label>Right Page Move Higher / Lower <input data-seq="overlays.right.position.y" type="number" step="0.01" /></label>
-          <label>Right Page Move Forward / Back <input data-seq="overlays.right.position.z" type="number" step="0.01" /></label>
-          <label>Right Page Tilt Up / Down <input data-seq="overlays.right.rotation.x" type="number" step="1" /></label>
-          <label>Right Page Turn Left / Right <input data-seq="overlays.right.rotation.y" type="number" step="1" /></label>
-          <label>Right Page Lean Sideways <input data-seq="overlays.right.rotation.z" type="number" step="1" /></label>
-          <label>Right Page Width <input data-seq="overlays.right.scale.x" type="number" step="0.01" /></label>
-          <label>Right Page Height <input data-seq="overlays.right.scale.y" type="number" step="0.01" /></label>
-          <label>Overlay opacity <input data-seq="overlays.opacity" type="number" step="0.05" min="0" max="1" /></label>
-          <label class="toggle-label">Show borders <input data-seq="overlays.borderVisible" type="checkbox" /></label>
-
           <div class="control-section final-content-controls">
             <p class="section-title">Final Bible Content View</p>
-            <p class="section-help">Tune the final moment where the open Bible becomes the website canvas. The book stays fixed; only the camera and page content zones change.</p>
+            <p class="section-help">Tune the final moment where the open Bible becomes one wide website canvas. The book stays fixed; only the camera and content surface change.</p>
           </div>
 
           <label>Move camera left/right <input data-seq="camera.bible_content_fullscreen.position.x" type="number" step="0.05" /></label>
           <label>Move camera higher/lower <input data-seq="camera.bible_content_fullscreen.position.y" type="number" step="0.05" /></label>
-          <label>Move camera closer/further <input data-seq="camera.bible_content_fullscreen.distance" type="number" step="0.01" min="0.12" max="1.2" /></label>
+          <label>Move camera forward/back <input data-seq="camera.bible_content_fullscreen.position.z" type="number" step="0.05" /></label>
           <label>Look left/right <input data-seq="camera.bible_content_fullscreen.target.x" type="number" step="0.05" /></label>
           <label>Look up/down <input data-seq="camera.bible_content_fullscreen.target.y" type="number" step="0.05" /></label>
+          <label>Look closer/further <input data-seq="camera.bible_content_fullscreen.target.z" type="number" step="0.05" /></label>
           <label>Zoom in/out <input data-seq="camera.bible_content_fullscreen.fov" type="number" step="1" min="12" max="70" /></label>
-          <label>Rotate final frame slightly left/right <input data-seq="content.rotation" type="number" step="0.25" min="-8" max="8" /></label>
-          <label>Page content width <input data-seq="content.width" type="number" step="0.01" min="0.5" max="3.4" /></label>
-          <label>Page content height <input data-seq="content.height" type="number" step="0.01" min="0.5" max="3.2" /></label>
-          <label>Page content move left/right <input data-seq="content.moveX" type="number" step="0.01" /></label>
-          <label>Page content move up/down <input data-seq="content.moveY" type="number" step="0.01" /></label>
-          <label>Page content opacity <input data-seq="content.opacity" type="number" step="0.05" min="0" max="1" /></label>
-          <label>Page content margin/padding <input data-seq="content.padding" type="number" step="0.05" min="0.2" max="2" /></label>
+          <label>Move closer / further <input data-seq="camera.bible_content_fullscreen.distance" type="number" step="0.01" min="0.12" max="1.2" /></label>
+
+          <div class="control-section">
+            <p class="section-title">Single Bible Content Surface</p>
+            <p class="section-help">One parchment-like surface across the open Bible view. This is where future website chapters will sit.</p>
+          </div>
+
+          <label>Content Move Left / Right <input data-seq="content.moveX" type="number" step="0.01" /></label>
+          <label>Content Move Up / Down <input data-seq="content.moveY" type="number" step="0.01" /></label>
+          <label>Content Move Closer / Further <input data-seq="content.moveZ" type="number" step="0.01" /></label>
+          <label>Content Tilt Up / Down <input data-seq="content.tilt" type="number" step="1" /></label>
+          <label>Content Turn Left / Right <input data-seq="content.turn" type="number" step="1" /></label>
+          <label>Content Lean Sideways <input data-seq="content.lean" type="number" step="1" /></label>
+          <label>Content Width <input data-seq="content.width" type="number" step="0.01" min="0.5" max="5" /></label>
+          <label>Content Height <input data-seq="content.height" type="number" step="0.01" min="0.5" max="3.2" /></label>
+          <label>Content Opacity <input data-seq="content.opacity" type="number" step="0.05" min="0" max="1" /></label>
+          <label>Content Padding <input data-seq="content.padding" type="number" step="0.05" min="0.2" max="2" /></label>
           <label>Hide original page text <input data-seq="content.pageTextSuppression" type="number" step="0.05" min="0" max="1" /></label>
-          <label class="toggle-label">Show calibration borders <input data-seq="overlays.borderVisible" type="checkbox" /></label>
+          <label class="toggle-label">Show Content Borders <input data-seq="content.borderVisible" type="checkbox" /></label>
         </div>
 
         <div class="button-stack">
@@ -168,7 +154,7 @@
           <button class="print-button" id="copyHomepageConfig" type="button">Copy approved config for homepage</button>
           <button class="print-button" id="exportApprovedConfig" type="button">Export approved config</button>
           <button class="print-button secondary" id="applyApprovedConfig" type="button">Apply approved config to homepage</button>
-          <button class="print-button" id="saveFinalBibleContentView" type="button">Save final Bible content view</button>
+          <button class="print-button" id="saveFinalBibleContentView" type="button">Save final Bible content surface</button>
           <button class="print-button" id="printFinalBibleContentConfig" type="button">Print final Bible content config</button>
           <button class="print-button secondary" id="applyFinalBibleContentConfig" type="button">Apply final Bible content config to homepage</button>
           <button class="print-button" id="printSequence" type="button">Print final sequence config</button>
@@ -179,11 +165,11 @@
       </section>
 
       <div class="page-overlay-test" id="pageOverlayTest" aria-hidden="true">
-        <div class="page-safe-area leftPageSafeArea" id="leftPageSafeArea">
-          <div class="page-text">Hope begins here.</div>
-        </div>
-        <div class="page-safe-area rightPageSafeArea" id="rightPageSafeArea">
-          <div class="page-text">You are welcome.</div>
+        <div class="page-safe-area singleBibleContentSurface" id="singleBibleContentSurface">
+          <div class="page-text">
+            <h2>Welcome to Munadi Hope Center</h2>
+            <p>A place of faith, hope, prayer, and community.</p>
+          </div>
         </div>
       </div>
     </main>
