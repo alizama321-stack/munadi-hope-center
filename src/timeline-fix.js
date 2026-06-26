@@ -3,10 +3,10 @@
 // This prevents visitors from landing on the last chapter as soon as the Bible zoom finishes.
 
 const CAMERA_READING_TARGET = 0.78;
-const HERO_REVEAL_START = 0.16;
-const HERO_REVEAL_END = 0.26;
-const HERO_FADE_START = 0.48;
-const HERO_FADE_END = 0.62;
+const HERO_REVEAL_START = 0.2;
+const HERO_REVEAL_END = 0.32;
+const HERO_FADE_START = 0.43;
+const HERO_FADE_END = 0.54;
 const CONTENT_REVEAL_START = 0.72;
 const CONTENT_REVEAL_END = 0.8;
 const CHAPTER_SCROLL_START = 0.82;
@@ -66,53 +66,62 @@ function setupEnterNavigation() {
   );
 }
 
-function applyCenteredHeroStage(hero) {
-  hero.style.position = 'fixed';
-  hero.style.left = '50%';
-  hero.style.top = '49%';
-  hero.style.width = 'min(760px, calc(100vw - 3rem))';
-  hero.style.maxWidth = '760px';
-  hero.style.zIndex = '6';
-  hero.style.alignItems = 'center';
-  hero.style.textAlign = 'center';
-  hero.style.gap = '1rem';
-
-  const eyebrow = hero.querySelector('.eyebrow');
-  const title = hero.querySelector('h1');
-  const lede = hero.querySelector('.lede');
-  const actions = hero.querySelector('.hero-actions');
-
-  if (eyebrow) eyebrow.style.justifyContent = 'center';
-  if (title) {
-    title.style.maxWidth = '12ch';
-    title.style.fontSize = 'clamp(2.7rem, 5.5vw, 5.9rem)';
-    title.style.textAlign = 'center';
-  }
-  if (lede) {
-    lede.style.maxWidth = 'min(54ch, 100%)';
-    lede.style.textAlign = 'center';
-  }
-  if (actions) {
-    actions.style.justifyContent = 'center';
-    actions.style.width = '100%';
-  }
+function ensureHeroStageStyles() {
+  if (document.getElementById('mhc-hero-stage-style')) return;
+  const style = document.createElement('style');
+  style.id = 'mhc-hero-stage-style';
+  style.textContent = `
+    #heroCopy.mhc-hero-stage {
+      position: fixed !important;
+      left: 50% !important;
+      top: 49% !important;
+      width: min(760px, calc(100vw - 3rem)) !important;
+      max-width: 760px !important;
+      z-index: 6 !important;
+      align-items: center !important;
+      text-align: center !important;
+      gap: 1rem !important;
+      opacity: var(--hero-stage-opacity, 0) !important;
+      transform: translate(-50%, -50%) translate3d(0, var(--hero-stage-y, 0px), 0) !important;
+      pointer-events: var(--hero-stage-pointer, none) !important;
+      will-change: opacity, transform !important;
+    }
+    #heroCopy.mhc-hero-stage .eyebrow {
+      justify-content: center !important;
+    }
+    #heroCopy.mhc-hero-stage h1 {
+      max-width: 12ch !important;
+      font-size: clamp(2.7rem, 5.5vw, 5.9rem) !important;
+      text-align: center !important;
+    }
+    #heroCopy.mhc-hero-stage .lede {
+      max-width: min(54ch, 100%) !important;
+      text-align: center !important;
+    }
+    #heroCopy.mhc-hero-stage .hero-actions {
+      justify-content: center !important;
+      width: 100% !important;
+    }
+  `;
+  document.head.appendChild(style);
 }
 
 function updateHeroLockout(progress) {
   const hero = document.getElementById('heroCopy');
   if (!hero) return;
 
-  applyCenteredHeroStage(hero);
+  ensureHeroStageStyles();
+  hero.classList.add('mhc-hero-stage');
 
-  // The hero belongs to the aisle reveal: it appears after entry and leaves before the Bible stage.
+  // The hero belongs to the aisle reveal, before the lectern/book closeup.
   const reveal = smoothstep(HERO_REVEAL_START, HERO_REVEAL_END, progress);
   const fadeOut = smoothstep(HERO_FADE_START, HERO_FADE_END, progress);
   const opacity = reveal * (1 - fadeOut);
-  const lift = -18 * reveal - 34 * fadeOut;
+  const lift = -14 * reveal - 30 * fadeOut;
 
-  hero.style.opacity = opacity.toFixed(3);
-  hero.style.transform = `translate(-50%, -50%) translate3d(0, ${lift.toFixed(1)}px, 0)`;
-  hero.style.pointerEvents = opacity > 0.35 ? 'auto' : 'none';
+  hero.style.setProperty('--hero-stage-opacity', opacity.toFixed(3));
+  hero.style.setProperty('--hero-stage-y', `${lift.toFixed(1)}px`);
+  hero.style.setProperty('--hero-stage-pointer', opacity > 0.35 ? 'auto' : 'none');
   hero.setAttribute('aria-hidden', opacity > 0.05 ? 'false' : 'true');
 }
 
