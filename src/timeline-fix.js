@@ -2,14 +2,14 @@
 // Keeps the cinematic camera journey separate from Bible chapter reading.
 // This prevents visitors from landing on the last chapter as soon as the Bible zoom finishes.
 
-const CAMERA_READING_TARGET = 0.78;
-const HERO_REVEAL_START = 0.2;
-const HERO_REVEAL_END = 0.32;
-const HERO_FADE_START = 0.43;
-const HERO_FADE_END = 0.54;
-const CONTENT_REVEAL_START = 0.72;
-const CONTENT_REVEAL_END = 0.8;
-const CHAPTER_SCROLL_START = 0.82;
+const CAMERA_READING_TARGET = 0.68;
+const HERO_REVEAL_START = 0.16;
+const HERO_REVEAL_END = 0.26;
+const HERO_FADE_START = 0.36;
+const HERO_FADE_END = 0.48;
+const CONTENT_REVEAL_START = 0.64;
+const CONTENT_REVEAL_END = 0.72;
+const CHAPTER_SCROLL_START = 0.76;
 const CHAPTER_SCROLL_END = 0.98;
 const CHAPTER_DAMPING = 5.2;
 
@@ -56,8 +56,6 @@ function setupEnterNavigation() {
     (event) => {
       const link = event.target.closest('a[data-scroll-end="true"]');
       if (!link) return;
-
-      // Stop the old behavior from jumping to the absolute bottom of the journey.
       event.preventDefault();
       event.stopImmediatePropagation();
       history.pushState(null, '', '#journey');
@@ -73,7 +71,7 @@ function ensureProductionStageStyles() {
   style.id = 'mhc-production-stage-style';
   style.textContent = `
     .journey-stage {
-      min-height: 2200vh !important;
+      min-height: 1500vh !important;
     }
 
     #heroCopy.mhc-hero-stage {
@@ -151,7 +149,6 @@ function updateHeroLockout(progress) {
   ensureProductionStageStyles();
   hero.classList.add('mhc-hero-stage');
 
-  // The hero belongs to the aisle reveal, before the lectern/book closeup.
   const reveal = smoothstep(HERO_REVEAL_START, HERO_REVEAL_END, progress);
   const fadeOut = smoothstep(HERO_FADE_START, HERO_FADE_END, progress);
   const opacity = reveal * (1 - fadeOut);
@@ -177,7 +174,6 @@ function updateBibleContent(delta) {
   const reveal = smoothstep(CONTENT_REVEAL_START, CONTENT_REVEAL_END, progress);
   surface.classList.toggle('mhc-centered-book-content', reveal > 0.02);
 
-  // The content should appear when the Bible is framed, but Chapter 1 should hold first.
   const chapterProgress = smoothstep(CHAPTER_SCROLL_START, CHAPTER_SCROLL_END, progress);
   const chapterCount = Math.max(1, Math.max(...chapters.map((chapter) => Number(chapter.dataset.chapter || 0))) + 1);
   const goalCursor = chapterProgress * Math.max(0, chapterCount - 1);
