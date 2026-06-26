@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { APPROVED_SEQUENCE_CONFIG } from './approved-sequence-config.js';
+import { APPROVED_BIBLE_CONTENT_SURFACE_CONFIG, APPROVED_SEQUENCE_CONFIG } from './approved-sequence-config.js';
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const lowPowerViewport = window.matchMedia('(max-width: 720px)').matches;
@@ -27,6 +27,7 @@ const CONTENT_CONFIG = APPROVED_SEQUENCE_CONFIG.content || {
   pageCoverStart: 0.76,
   pageCoverEnd: 0.94,
 };
+const CONTENT_SURFACE_CONFIG = APPROVED_BIBLE_CONTENT_SURFACE_CONFIG;
 const timeline = [
   { at: 0, key: 'gate_entry' },
   { at: 0.16, key: 'aisle_reveal' },
@@ -37,6 +38,8 @@ const timeline = [
   { at: 0.94, key: 'bible_open_pages' },
   { at: 1, key: 'bible_content_view' },
 ];
+
+let renderedChapterCursor = 0;
 
 function clamp(value, min = 0, max = 1) {
   return Math.max(min, Math.min(max, value));
@@ -392,7 +395,6 @@ function dampVector(current, target, damping, delta) {
 
 function updateHeroOverlay(progress) {
   const heroCopy = document.getElementById('heroCopy');
-  const label = document.getElementById('timelineLabel');
   const heroIn = smoothstep(0.48, 0.62, progress);
   const heroOut = smoothstep(0.78, 0.9, progress);
   const heroOpacity = reducedMotion ? 1 : heroIn * (1 - heroOut);
@@ -403,15 +405,14 @@ function updateHeroOverlay(progress) {
     heroCopy.style.pointerEvents = heroOpacity > 0.4 ? 'auto' : 'none';
   }
 
-  if (label) {
-    label.textContent = '';
-  }
 }
 
 function projectPageArea(id, config, opacity, camera, bookRig) {
   const element = document.getElementById(id);
   if (!element) return;
   element.style.setProperty('--page-overlay-opacity', opacity.toFixed(3));
+  element.style.setProperty('--page-content-padding', `${config.padding.toFixed(3)}rem`);
+  element.style.setProperty('--safe-border-opacity', config.borderVisible ? '0.22' : '0');
   if (opacity <= 0.001) return;
 
   const area = new THREE.Object3D();
@@ -444,8 +445,8 @@ function projectPageArea(id, config, opacity, camera, bookRig) {
 
   element.style.setProperty('--safe-left', `${centerX}px`);
   element.style.setProperty('--safe-top', `${centerY}px`);
-  element.style.setProperty('--safe-width', `${THREE.MathUtils.clamp(screenWidth, 120, window.innerWidth * 0.72)}px`);
-  element.style.setProperty('--safe-height', `${THREE.MathUtils.clamp(screenHeight, 80, window.innerHeight * 0.52)}px`);
+  element.style.setProperty('--safe-width', `${THREE.MathUtils.clamp(screenWidth, 220, window.innerWidth * 0.92)}px`);
+  element.style.setProperty('--safe-height', `${THREE.MathUtils.clamp(screenHeight, 140, window.innerHeight * 0.78)}px`);
   element.style.setProperty('--safe-rotation', `${rotation}rad`);
 }
 
@@ -455,13 +456,12 @@ function updatePageOverlay(progress, openProgress, camera, bookRig) {
   const reveal = reducedMotion
     ? 1
     : Math.max(smoothstep(0.72, 1, openProgress), smoothstep(CONTENT_CONFIG.start, CONTENT_CONFIG.start + 0.035, progress));
-  const opacity = reveal * APPROVED_SEQUENCE_CONFIG.overlays.opacity;
+  const opacity = reveal * CONTENT_SURFACE_CONFIG.opacity;
   overlay.style.setProperty('--page-overlay-opacity', String(opacity));
   overlay.classList.toggle('is-readable', opacity > 0.45);
 
   if (lowPowerViewport) return;
-  projectPageArea('homeLeftPageSafeArea', APPROVED_SEQUENCE_CONFIG.overlays.left, opacity, camera, bookRig);
-  projectPageArea('homeRightPageSafeArea', APPROVED_SEQUENCE_CONFIG.overlays.right, opacity, camera, bookRig);
+  projectPageArea('homeBibleContentSurface', CONTENT_SURFACE_CONFIG, opacity, camera, bookRig);
 }
 
 function updateReadablePageSpread(pageSpread, opacity) {
@@ -472,12 +472,12 @@ function updateReadablePageSpread(pageSpread, opacity) {
     if (!child.isMesh || !child.material) return;
     child.material.opacity = child.name === 'HomepageReadablePageCrease'
       ? nextOpacity * 0.32
-      : nextOpacity * 0.96;
+      : nextOpacity * CONTENT_SURFACE_CONFIG.pageTextSuppression;
     child.material.needsUpdate = true;
   });
 }
 
-function updateBibleChapters(progress, openProgress) {
+function updateBibleChapters(progress, openProgress, delta = 1 / 60, immediate = false) {
   const chapters = [...document.querySelectorAll('.bible-chapter')];
   if (!chapters.length) return;
   const openReveal = reducedMotion
@@ -485,13 +485,21 @@ function updateBibleChapters(progress, openProgress) {
     : Math.max(smoothstep(0.74, 1, openProgress), smoothstep(CONTENT_CONFIG.start, CONTENT_CONFIG.start + 0.035, progress));
   const contentProgress = reducedMotion ? 1 : smoothstep(CONTENT_CONFIG.start, CONTENT_CONFIG.end, progress);
   const chapterCount = Math.max(1, Math.max(...chapters.map((chapter) => Number(chapter.dataset.chapter || 0))) + 1);
-  const chapterCursor = contentProgress * Math.max(1, chapterCount - 1);
+  const chapterCursorGoal = contentProgress * Math.max(1, chapterCount - 1);
+  renderedChapterCursor = immediate || reducedMotion
+    ? chapterCursorGoal
+    : THREE.MathUtils.damp(
+      renderedChapterCursor,
+      chapterCursorGoal,
+      SMOOTHING_CONFIG.contentDamping || 7,
+      delta,
+    );
 
   chapters.forEach((chapter) => {
     const index = Number(chapter.dataset.chapter || 0);
-    const chapterOpacity = clamp(1 - Math.abs(chapterCursor - index), 0, 1) * openReveal;
+    const chapterOpacity = smoothstep(0, 1, clamp(1 - Math.abs(renderedChapterCursor - index), 0, 1)) * openReveal;
     chapter.style.setProperty('--chapter-opacity', chapterOpacity.toFixed(3));
-    chapter.style.setProperty('--chapter-shift', `${((index - chapterCursor) * 12).toFixed(1)}px`);
+    chapter.style.setProperty('--chapter-shift', `${((index - renderedChapterCursor) * 16).toFixed(1)}px`);
     chapter.classList.toggle('is-active', chapterOpacity > 0.45);
     chapter.setAttribute('aria-hidden', chapterOpacity > 0.12 ? 'false' : 'true');
   });
@@ -691,7 +699,7 @@ async function setupScene() {
       );
       updateHeroOverlay(progress);
       updatePageOverlay(progress, renderedOpenProgress, camera, bookRig);
-      updateBibleChapters(progress, renderedOpenProgress);
+      updateBibleChapters(progress, renderedOpenProgress, delta, immediate);
     }
 
     let desiredProgress = scrollProgress();

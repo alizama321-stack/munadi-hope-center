@@ -277,7 +277,7 @@ main,
 }
 
 .journey-stage {
-  min-height: 900vh;
+  min-height: 1200vh;
   padding: 0;
 }
 
@@ -394,19 +394,6 @@ main,
   color: var(--cream);
 }
 
-.timeline-label {
-  position: absolute;
-  right: clamp(1.25rem, 5vw, 3rem);
-  bottom: clamp(1rem, 4vh, 2.5rem);
-  z-index: 3;
-  display: none;
-  color: rgba(255, 248, 233, 0.58);
-  font-size: 0.66rem;
-  font-weight: 800;
-  letter-spacing: 0.26em;
-  text-transform: uppercase;
-}
-
 .page-content-overlay {
   position: fixed;
   z-index: 4;
@@ -414,23 +401,25 @@ main,
   pointer-events: none;
 }
 
-.bible-page-surface {
+.bible-content-surface {
   position: fixed;
   left: var(--safe-left, 50%);
   top: var(--safe-top, 50%);
   width: var(--safe-width, 280px);
   height: var(--safe-height, 180px);
-  min-height: clamp(190px, 18vw, 320px);
-  padding: clamp(1rem, 1.7vw, 1.6rem);
-  border-radius: 2px;
+  min-height: clamp(230px, 24vw, 470px);
+  padding: var(--page-content-padding, 0.2rem);
+  border: 1px solid rgba(116, 78, 35, var(--safe-border-opacity, 0));
+  border-radius: 10px;
   background:
-    radial-gradient(circle at 20% 12%, rgba(255, 249, 232, 0.68), transparent 6rem),
-    radial-gradient(circle at 80% 92%, rgba(180, 123, 56, 0.15), transparent 8rem),
-    linear-gradient(135deg, rgba(250, 235, 194, 0.98), rgba(236, 211, 157, 0.96));
+    radial-gradient(ellipse at 18% 8%, rgba(255, 253, 235, 0.5), transparent 48%),
+    radial-gradient(ellipse at 76% 86%, rgba(173, 114, 47, 0.18), transparent 54%),
+    linear-gradient(135deg, rgba(255, 247, 219, 0.44), rgba(230, 194, 121, 0.2));
   color: #1f0f09;
   box-shadow:
-    inset 0 0 28px rgba(77, 42, 20, 0.08),
-    inset 0 0 0 1px rgba(122, 73, 29, 0.1);
+    inset 0 0 54px rgba(97, 58, 18, 0.13),
+    inset 0 1px 0 rgba(255, 252, 231, 0.24),
+    0 10px 28px rgba(55, 29, 7, 0.08);
   text-shadow:
     0 1px 0 rgba(255, 248, 226, 0.92),
     0 0 12px rgba(255, 241, 201, 0.46);
@@ -438,51 +427,63 @@ main,
   transform: translate3d(-50%, -50%, 0) rotate(var(--safe-rotation, 0rad));
   transform-origin: center;
   overflow: hidden;
-  transition: opacity 0.2s linear;
+  transition: opacity 0.28s linear;
+  mix-blend-mode: multiply;
+  backdrop-filter: blur(0.45px);
+  mask-image: radial-gradient(ellipse at center, #000 70%, rgba(0, 0, 0, 0.74) 86%, transparent 100%);
   pointer-events: none;
 }
 
-.bible-page-surface::before,
-.bible-page-surface::after {
+.bible-content-surface::before,
+.bible-content-surface::after {
   content: "";
   position: absolute;
   pointer-events: none;
   z-index: 0;
 }
 
-.bible-page-surface::before {
-  inset: 0.58rem;
-  border: 1px solid rgba(151, 101, 39, 0.3);
-  box-shadow: inset 0 0 0 1px rgba(255, 248, 226, 0.24);
+.bible-content-surface::before {
+  inset: clamp(0.45rem, 1vw, 0.9rem);
+  border-radius: 8px;
+  background-image:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(101, 69, 31, 0.07) 0,
+      rgba(101, 69, 31, 0.07) 1px,
+      transparent 1px,
+      transparent 20px
+    );
+  opacity: 0.12;
 }
 
-.bible-page-surface::after {
+.bible-content-surface::after {
   inset: 0;
   background:
-    repeating-linear-gradient(0deg, rgba(95, 54, 26, 0.024) 0 1px, transparent 1px 5px),
-    radial-gradient(circle at 18% 30%, rgba(81, 42, 20, 0.06), transparent 5rem);
+    repeating-linear-gradient(0deg, rgba(95, 54, 26, 0.018) 0 1px, transparent 1px 5px),
+    radial-gradient(circle at 18% 30%, rgba(81, 42, 20, 0.045), transparent 7rem);
   mix-blend-mode: multiply;
-  opacity: 0.62;
+  opacity: 0.44;
 }
 
 .page-content-overlay.is-readable {
   pointer-events: auto;
 }
 
-.page-content-overlay.is-readable .bible-page-surface {
+.page-content-overlay.is-readable .bible-content-surface {
   pointer-events: auto;
 }
 
 .bible-chapter {
   position: absolute;
-  inset: clamp(1.2rem, 2vw, 1.9rem);
+  inset: calc(var(--page-content-padding, 0.2rem) + clamp(0.76rem, 1.5vw, 1.25rem));
   z-index: 2;
   display: flex;
   flex-direction: column;
-  gap: clamp(0.38rem, 0.68vw, 0.68rem);
+  justify-content: center;
+  gap: clamp(0.5rem, 0.9vw, 0.9rem);
   opacity: var(--chapter-opacity, 0);
   transform: translate3d(0, var(--chapter-shift, 10px), 0);
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition: opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1), transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
   pointer-events: none;
 }
 
@@ -492,29 +493,60 @@ main,
 
 .page-kicker {
   color: rgba(111, 25, 21, 0.95);
-  font-size: clamp(0.56rem, 0.82vw, 0.72rem);
+  font-size: clamp(0.52rem, 0.72vw, 0.7rem);
   font-weight: 800;
   letter-spacing: 0.24em;
   text-transform: uppercase;
 }
 
+.chapter-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.04fr) minmax(220px, 0.96fr);
+  gap: clamp(0.9rem, 2.4vw, 2.4rem);
+  align-items: center;
+  min-height: 0;
+}
+
+.chapter-grid-intro {
+  grid-template-columns: minmax(0, 1.15fr) minmax(190px, 0.85fr);
+}
+
+.chapter-grid-map {
+  grid-template-columns: minmax(180px, 0.82fr) minmax(260px, 1.18fr);
+}
+
+.chapter-callout {
+  display: grid;
+  gap: clamp(0.55rem, 1vw, 0.9rem);
+  padding-left: clamp(0.8rem, 1.8vw, 1.5rem);
+  border-left: 1px solid rgba(111, 25, 21, 0.2);
+}
+
 .bible-chapter h2 {
   color: rgba(54, 15, 12, 0.98);
-  font-size: clamp(1.18rem, 1.68vw, 1.95rem);
-  line-height: 1.04;
+  font-size: clamp(1.28rem, 2.25vw, 2.65rem);
+  line-height: 0.98;
 }
 
 .bible-chapter p,
 .bible-chapter li,
 .bible-chapter dd {
   color: rgba(41, 23, 14, 0.98);
-  font-size: clamp(0.68rem, 0.88vw, 0.9rem);
+  font-size: clamp(0.66rem, 0.96vw, 1rem);
   line-height: 1.48;
+}
+
+.chapter-lede {
+  color: rgba(54, 29, 13, 0.94) !important;
+  font-family: "Cormorant Garamond", serif;
+  font-size: clamp(0.95rem, 1.55vw, 1.5rem) !important;
+  font-weight: 700;
+  line-height: 1.2 !important;
 }
 
 .scripture-note {
   font-family: "Cormorant Garamond", serif;
-  font-size: clamp(0.95rem, 1.35vw, 1.35rem) !important;
+  font-size: clamp(1rem, 1.5vw, 1.55rem) !important;
   font-style: italic;
   color: rgba(90, 48, 21, 0.92) !important;
 }
@@ -569,9 +601,11 @@ main,
 }
 
 .pastor-mini {
-  display: flex;
+  display: grid;
+  justify-items: center;
   align-items: center;
-  gap: 0.8rem;
+  gap: clamp(0.6rem, 1vw, 1rem);
+  text-align: center;
 }
 
 .pastor-initials {
@@ -613,7 +647,7 @@ main,
 
 .page-form {
   display: grid;
-  gap: 0.52rem;
+  gap: clamp(0.38rem, 0.68vw, 0.62rem);
 }
 
 .page-form label {
@@ -675,8 +709,8 @@ main,
 }
 
 .page-map {
-  position: absolute;
-  inset: clamp(1rem, 1.8vw, 1.6rem);
+  position: relative;
+  min-height: clamp(150px, 17vw, 260px);
   overflow: hidden;
   border: 1px solid rgba(112, 65, 25, 0.22);
   border-radius: 3px;
@@ -684,6 +718,8 @@ main,
 }
 
 .page-map iframe {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   border: 0;
@@ -779,7 +815,7 @@ main,
   }
 
   .journey-stage {
-    min-height: 720vh;
+    min-height: 880vh;
   }
 
   .journey-sticky {
@@ -810,26 +846,21 @@ main,
     flex: 1 1 100%;
   }
 
-  .timeline-label {
-    left: 1.25rem;
-    right: auto;
-    bottom: 1.4rem;
-  }
-
   .page-content-overlay {
     inset: 0;
   }
 
-  .bible-page-surface {
+  .bible-content-surface {
     position: relative;
     left: auto;
     top: auto;
-    width: min(360px, calc(100vw - 1.5rem));
+    width: min(440px, calc(100vw - 1.5rem));
     height: auto;
     margin: 0.65rem auto;
     min-height: auto;
     padding: 0.9rem;
     transform: none;
+    mask-image: none;
   }
 
   .bible-chapter {
@@ -842,8 +873,18 @@ main,
     display: flex;
   }
 
-  .bible-page-right {
-    margin-top: 0;
+  .chapter-grid,
+  .chapter-grid-intro,
+  .chapter-grid-map {
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+  }
+
+  .chapter-callout {
+    padding-left: 0;
+    border-left: 0;
+    border-top: 1px solid rgba(111, 25, 21, 0.18);
+    padding-top: 0.7rem;
   }
 }
 

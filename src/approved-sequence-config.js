@@ -15,6 +15,16 @@ export const APPROVED_BOOK_TRANSFORMS = {
   },
 };
 
+export const APPROVED_BIBLE_CONTENT_SURFACE_CONFIG = {
+  position: [-0.18, -0.46, -0.055],
+  rotation: [0, 0, 3],
+  scale: [4.23, 2.12],
+  opacity: 1,
+  padding: 0.2,
+  pageTextSuppression: 0.92,
+  borderVisible: false,
+};
+
 export const APPROVED_SEQUENCE_CONFIG = {
   progress: 0,
   book: APPROVED_BOOK_TRANSFORMS,
@@ -63,10 +73,16 @@ export const APPROVED_SEQUENCE_CONFIG = {
         distance: 0.34,
       },
       bible_content_view: {
-        position: [-12.85, 7.85, -2],
-        target: [-2.8, -2.35, -1.9],
-        fov: 34,
-        distance: 0.34,
+        position: [-12.95, 9.9, -1.65],
+        target: [-2.95, -2.9, -1.9],
+        fov: 12,
+        distance: 0.3,
+      },
+      bible_content_fullscreen: {
+        position: [-12.95, 9.9, -1.65],
+        target: [-2.95, -2.9, -1.9],
+        fov: 12,
+        distance: 0.3,
       },
     },
   },
@@ -111,11 +127,12 @@ export const APPROVED_SEQUENCE_CONFIG = {
     scrollEnd: 0.98,
   },
   smoothing: {
-    cameraDamping: 3.2,
-    targetDamping: 3.8,
-    fovDamping: 4.5,
-    animationDamping: 3.2,
-    scrollDamping: 6,
+    cameraDamping: 5.2,
+    targetDamping: 5.8,
+    fovDamping: 6.4,
+    animationDamping: 5.6,
+    scrollDamping: 8.5,
+    contentDamping: 7.2,
   },
   lighting: {
     toneMappingExposure: 1.05,
@@ -169,7 +186,7 @@ export const APPROVED_SEQUENCE_CONFIG = {
     },
   },
   content: {
-    start: 0.9,
+    start: 0.88,
     end: 1,
     pageCoverStart: 0.82,
     pageCoverEnd: 0.96,
