@@ -7,9 +7,17 @@ const HERO_REVEAL_START = 0.16;
 const HERO_REVEAL_END = 0.26;
 const HERO_FADE_START = 0.36;
 const HERO_FADE_END = 0.48;
-const CONTENT_REVEAL_START = 0.64;
-const CONTENT_REVEAL_END = 0.72;
-const CHAPTER_SCROLL_START = 0.76;
+
+// Closed-book preview: Chapter 1 appears beside the Bible before the book opens.
+const SIDE_PREVIEW_START = 0.52;
+const SIDE_PREVIEW_FULL = 0.58;
+const SIDE_PREVIEW_FADE_START = 0.70;
+const SIDE_PREVIEW_FADE_END = 0.76;
+
+// Open-book reading stage.
+const CENTER_READING_START = 0.74;
+const CENTER_READING_FULL = 0.82;
+const CHAPTER_SCROLL_START = 0.80;
 const CHAPTER_SCROLL_END = 0.98;
 const CHAPTER_DAMPING = 5.2;
 
@@ -106,6 +114,61 @@ function ensureProductionStageStyles() {
       width: 100% !important;
     }
 
+    #homeBibleContentSurface.mhc-book-side-preview {
+      position: fixed !important;
+      left: clamp(2.2rem, 7vw, 7rem) !important;
+      top: 52% !important;
+      width: min(560px, 34vw) !important;
+      height: auto !important;
+      min-height: 330px !important;
+      max-height: 60vh !important;
+      padding: clamp(1.3rem, 2vw, 2rem) !important;
+      transform: translateY(-50%) translate3d(0, var(--side-preview-y, 0px), 0) !important;
+      transform-origin: left center !important;
+      border-radius: 12px !important;
+      opacity: var(--page-overlay-opacity, 0) !important;
+      transition: opacity 0.28s ease, transform 0.28s ease !important;
+      background:
+        radial-gradient(ellipse at 20% 10%, rgba(255, 253, 235, 0.58), transparent 56%),
+        linear-gradient(135deg, rgba(255, 247, 219, 0.46), rgba(230, 194, 121, 0.20)) !important;
+      mask-image: radial-gradient(ellipse at center, #000 76%, rgba(0, 0, 0, 0.76) 92%, transparent 100%) !important;
+    }
+    #homeBibleContentSurface.mhc-book-side-preview .bible-chapter {
+      position: relative !important;
+      inset: auto !important;
+      opacity: 0 !important;
+      transform: none !important;
+      display: none !important;
+    }
+    #homeBibleContentSurface.mhc-book-side-preview .bible-chapter[data-chapter="0"] {
+      opacity: 1 !important;
+      display: flex !important;
+      justify-content: center !important;
+      min-height: 290px !important;
+    }
+    #homeBibleContentSurface.mhc-book-side-preview .chapter-grid,
+    #homeBibleContentSurface.mhc-book-side-preview .chapter-grid-intro {
+      display: block !important;
+    }
+    #homeBibleContentSurface.mhc-book-side-preview .chapter-callout {
+      margin-top: 1.15rem !important;
+      padding-left: 0 !important;
+      border-left: 0 !important;
+    }
+    #homeBibleContentSurface.mhc-book-side-preview h2 {
+      font-size: clamp(1.65rem, 2.6vw, 3.1rem) !important;
+      line-height: 0.98 !important;
+      max-width: 13ch !important;
+    }
+    #homeBibleContentSurface.mhc-book-side-preview p {
+      font-size: clamp(0.88rem, 1.08vw, 1.08rem) !important;
+    }
+    #homeBibleContentSurface.mhc-book-side-preview .page-btn {
+      display: inline-flex !important;
+      width: auto !important;
+      min-width: 210px !important;
+    }
+
     #homeBibleContentSurface.mhc-centered-book-content {
       position: fixed !important;
       left: 50% !important;
@@ -171,12 +234,18 @@ function updateBibleContent(delta) {
   const progress = journeyProgress();
   updateHeroLockout(progress);
 
-  const reveal = smoothstep(CONTENT_REVEAL_START, CONTENT_REVEAL_END, progress);
-  surface.classList.toggle('mhc-centered-book-content', reveal > 0.02);
+  const sideReveal = smoothstep(SIDE_PREVIEW_START, SIDE_PREVIEW_FULL, progress) * (1 - smoothstep(SIDE_PREVIEW_FADE_START, SIDE_PREVIEW_FADE_END, progress));
+  const centerReveal = smoothstep(CENTER_READING_START, CENTER_READING_FULL, progress);
+  const inSidePreview = sideReveal > centerReveal && sideReveal > 0.01;
+  const reveal = Math.max(sideReveal, centerReveal);
+
+  surface.classList.toggle('mhc-book-side-preview', inSidePreview);
+  surface.classList.toggle('mhc-centered-book-content', !inSidePreview && centerReveal > 0.02);
+  surface.style.setProperty('--side-preview-y', `${((1 - sideReveal) * 18).toFixed(1)}px`);
 
   const chapterProgress = smoothstep(CHAPTER_SCROLL_START, CHAPTER_SCROLL_END, progress);
   const chapterCount = Math.max(1, Math.max(...chapters.map((chapter) => Number(chapter.dataset.chapter || 0))) + 1);
-  const goalCursor = chapterProgress * Math.max(0, chapterCount - 1);
+  const goalCursor = inSidePreview ? 0 : chapterProgress * Math.max(0, chapterCount - 1);
   renderedChapterCursor = damp(renderedChapterCursor, goalCursor, CHAPTER_DAMPING, delta);
 
   overlay.style.setProperty('--page-overlay-opacity', reveal.toFixed(3));
@@ -186,7 +255,9 @@ function updateBibleContent(delta) {
 
   chapters.forEach((chapter) => {
     const index = Number(chapter.dataset.chapter || 0);
-    const chapterOpacity = smoothstep(0, 1, clamp(1 - Math.abs(renderedChapterCursor - index), 0, 1)) * reveal;
+    const chapterOpacity = inSidePreview
+      ? (index === 0 ? reveal : 0)
+      : smoothstep(0, 1, clamp(1 - Math.abs(renderedChapterCursor - index), 0, 1)) * centerReveal;
     chapter.style.setProperty('--chapter-opacity', chapterOpacity.toFixed(3));
     chapter.style.setProperty('--chapter-shift', `${((index - renderedChapterCursor) * 16).toFixed(1)}px`);
     chapter.classList.toggle('is-active', chapterOpacity > 0.45);
