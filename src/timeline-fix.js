@@ -1,22 +1,23 @@
 // Runtime production timeline fix.
-// Keeps the cinematic camera journey separate from Bible chapter reading.
-// Chapter 1 now appears only as a closed-book side preview and disappears before the book opens.
+// Separates the closed-book Chapter 1 intro from the open-Bible website chapters.
 
-const CAMERA_READING_TARGET = 0.68;
+const ENTER_TARGET = 0.55;
+const OPEN_BOOK_TARGET = 0.74;
+
 const HERO_REVEAL_START = 0.16;
 const HERO_REVEAL_END = 0.26;
 const HERO_FADE_START = 0.36;
 const HERO_FADE_END = 0.48;
 
-// Closed-book preview: Chapter 1 appears beside the closed Bible, then leaves before opening begins.
-const SIDE_PREVIEW_START = 0.50;
-const SIDE_PREVIEW_FULL = 0.55;
-const SIDE_PREVIEW_FADE_START = 0.59;
-const SIDE_PREVIEW_FADE_END = 0.62;
+// Chapter 1 appears only while the book is still closed.
+const CLOSED_INTRO_START = 0.50;
+const CLOSED_INTRO_FULL = 0.55;
+const CLOSED_INTRO_FADE_START = 0.59;
+const CLOSED_INTRO_END = 0.62;
 
-// Open-book reading stage. Chapter 1 is intentionally skipped here.
-const CENTER_READING_START = 0.74;
-const CENTER_READING_FULL = 0.82;
+// Open-book reading stage. It intentionally skips Chapter 1.
+const OPEN_READING_START = 0.74;
+const OPEN_READING_FULL = 0.82;
 const CHAPTER_SCROLL_START = 0.80;
 const CHAPTER_SCROLL_END = 0.98;
 const CHAPTER_DAMPING = 5.2;
@@ -55,22 +56,52 @@ function scrollJourneyToProgress(progress) {
   window.scrollTo({ top, behavior: 'smooth' });
 }
 
-function setupEnterNavigation() {
+function setupNavigation() {
   if (capturedNavigation) return;
   capturedNavigation = true;
 
   document.addEventListener(
     'click',
     (event) => {
+      const openBookLink = event.target.closest('[data-open-book="true"]');
+      if (openBookLink) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        scrollJourneyToProgress(OPEN_BOOK_TARGET);
+        return;
+      }
+
       const link = event.target.closest('a[data-scroll-end="true"]');
       if (!link) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       history.pushState(null, '', '#journey');
-      scrollJourneyToProgress(CAMERA_READING_TARGET);
+      scrollJourneyToProgress(ENTER_TARGET);
     },
     true,
   );
+}
+
+function ensureClosedBookIntro() {
+  let intro = document.getElementById('closedBookIntro');
+  if (intro) return intro;
+
+  const chapterOne = document.querySelector('.bible-chapter[data-chapter="0"]');
+  if (!chapterOne) return null;
+
+  intro = document.createElement('aside');
+  intro.id = 'closedBookIntro';
+  intro.className = 'mhc-closed-book-intro';
+  intro.setAttribute('aria-label', 'Welcome chapter intro');
+  intro.innerHTML = chapterOne.innerHTML;
+
+  intro.querySelectorAll('[data-scroll-end]').forEach((element) => {
+    element.removeAttribute('data-scroll-end');
+    element.setAttribute('data-open-book', 'true');
+  });
+
+  document.body.appendChild(intro);
+  return intro;
 }
 
 function ensureProductionStageStyles() {
@@ -112,72 +143,57 @@ function ensureProductionStageStyles() {
       width: 100% !important;
     }
 
-    #homeBibleContentSurface.mhc-book-side-preview {
-      position: fixed !important;
-      left: clamp(2.2rem, 7vw, 7rem) !important;
-      top: 52% !important;
-      width: min(620px, 38vw) !important;
-      height: auto !important;
-      min-height: 0 !important;
-      max-height: none !important;
-      padding: 0 !important;
-      transform: translateY(-50%) translate3d(0, var(--side-preview-y, 0px), 0) !important;
-      transform-origin: left center !important;
-      border: 0 !important;
-      border-radius: 0 !important;
-      opacity: var(--page-overlay-opacity, 0) !important;
-      transition: opacity 0.28s ease, transform 0.28s ease !important;
-      background: transparent !important;
-      box-shadow: none !important;
-      mask-image: none !important;
-      mix-blend-mode: normal !important;
-      backdrop-filter: none !important;
-      color: var(--cream) !important;
-      text-shadow: 0 16px 38px rgba(0, 0, 0, 0.62) !important;
+    .mhc-closed-book-intro {
+      position: fixed;
+      left: clamp(2.2rem, 7vw, 7rem);
+      top: 52%;
+      z-index: 7;
+      width: min(620px, 38vw);
+      color: var(--cream);
+      opacity: var(--closed-book-opacity, 0);
+      transform: translateY(-50%) translate3d(0, var(--closed-book-y, 0px), 0);
+      pointer-events: var(--closed-book-pointer, none);
+      transition: opacity 0.28s ease, transform 0.28s ease;
+      text-shadow: 0 16px 38px rgba(0, 0, 0, 0.66);
+      will-change: opacity, transform;
     }
-    #homeBibleContentSurface.mhc-book-side-preview::before,
-    #homeBibleContentSurface.mhc-book-side-preview::after { display: none !important; }
-    #homeBibleContentSurface.mhc-book-side-preview .bible-chapter {
+    .mhc-closed-book-intro .bible-chapter,
+    .mhc-closed-book-intro .chapter-grid,
+    .mhc-closed-book-intro .chapter-grid-intro {
+      display: block !important;
       position: relative !important;
       inset: auto !important;
-      opacity: 0 !important;
-      transform: none !important;
-      display: none !important;
-      gap: 1rem !important;
-    }
-    #homeBibleContentSurface.mhc-book-side-preview .bible-chapter[data-chapter="0"] {
       opacity: 1 !important;
-      display: flex !important;
-      justify-content: center !important;
+      transform: none !important;
     }
-    #homeBibleContentSurface.mhc-book-side-preview .chapter-grid,
-    #homeBibleContentSurface.mhc-book-side-preview .chapter-grid-intro { display: block !important; }
-    #homeBibleContentSurface.mhc-book-side-preview .chapter-callout {
-      margin-top: 1.15rem !important;
-      padding-left: 0 !important;
-      border-left: 0 !important;
-    }
-    #homeBibleContentSurface.mhc-book-side-preview .page-kicker {
+    .mhc-closed-book-intro .page-kicker {
       color: var(--gold-light) !important;
+      margin-bottom: 0.95rem !important;
       text-shadow: 0 10px 32px rgba(0, 0, 0, 0.72) !important;
     }
-    #homeBibleContentSurface.mhc-book-side-preview h2 {
+    .mhc-closed-book-intro h2 {
       color: var(--cream) !important;
       font-size: clamp(2.8rem, 5.5vw, 6rem) !important;
       line-height: 0.96 !important;
       max-width: 11ch !important;
-      text-shadow: 0 22px 54px rgba(0, 0, 0, 0.6) !important;
+      text-shadow: 0 22px 54px rgba(0, 0, 0, 0.62) !important;
     }
-    #homeBibleContentSurface.mhc-book-side-preview p {
+    .mhc-closed-book-intro p {
       color: rgba(255, 248, 233, 0.86) !important;
       font-size: clamp(0.95rem, 1.2vw, 1.15rem) !important;
       max-width: 42ch !important;
     }
-    #homeBibleContentSurface.mhc-book-side-preview .scripture-note {
+    .mhc-closed-book-intro .chapter-callout {
+      margin-top: 1.2rem !important;
+      padding-left: 0 !important;
+      border-left: 0 !important;
+    }
+    .mhc-closed-book-intro .scripture-note {
       color: var(--gold-light) !important;
       font-size: clamp(1.1rem, 1.7vw, 1.55rem) !important;
+      margin-bottom: 0.8rem !important;
     }
-    #homeBibleContentSurface.mhc-book-side-preview .page-btn {
+    .mhc-closed-book-intro .page-btn {
       display: inline-flex !important;
       width: auto !important;
       min-width: 210px !important;
@@ -197,7 +213,7 @@ function ensureProductionStageStyles() {
       opacity: var(--page-overlay-opacity, 0) !important;
       transition: opacity 0.32s ease !important;
     }
-    #homeBibleContentSurface.mhc-centered-book-content .bible-chapter[data-chapter="0"] {
+    #homeBibleContentSurface .bible-chapter[data-chapter="0"] {
       display: none !important;
       opacity: 0 !important;
       pointer-events: none !important;
@@ -226,11 +242,10 @@ function ensureProductionStageStyles() {
   document.head.appendChild(style);
 }
 
-function updateHeroLockout(progress) {
+function updateHero(progress) {
   const hero = document.getElementById('heroCopy');
   if (!hero) return;
 
-  ensureProductionStageStyles();
   hero.classList.add('mhc-hero-stage');
 
   const reveal = smoothstep(HERO_REVEAL_START, HERO_REVEAL_END, progress);
@@ -244,25 +259,30 @@ function updateHeroLockout(progress) {
   hero.setAttribute('aria-hidden', opacity > 0.05 ? 'false' : 'true');
 }
 
-function updateBibleContent(delta) {
+function updateClosedBookIntro(progress) {
+  const intro = ensureClosedBookIntro();
+  if (!intro) return 0;
+
+  const reveal = smoothstep(CLOSED_INTRO_START, CLOSED_INTRO_FULL, progress);
+  const fadeOut = smoothstep(CLOSED_INTRO_FADE_START, CLOSED_INTRO_END, progress);
+  const opacity = reveal * (1 - fadeOut);
+  const y = (1 - reveal) * 18 - fadeOut * 20;
+
+  intro.style.setProperty('--closed-book-opacity', opacity.toFixed(3));
+  intro.style.setProperty('--closed-book-y', `${y.toFixed(1)}px`);
+  intro.style.setProperty('--closed-book-pointer', opacity > 0.45 ? 'auto' : 'none');
+  intro.setAttribute('aria-hidden', opacity > 0.08 ? 'false' : 'true');
+  return opacity;
+}
+
+function updateOpenBookContent(progress, delta) {
   const chapters = [...document.querySelectorAll('.bible-chapter')];
   const overlay = document.getElementById('pageContentOverlay');
   const surface = document.getElementById('homeBibleContentSurface');
   if (!chapters.length || !overlay || !surface) return;
 
-  ensureProductionStageStyles();
-
-  const progress = journeyProgress();
-  updateHeroLockout(progress);
-
-  const sideReveal = smoothstep(SIDE_PREVIEW_START, SIDE_PREVIEW_FULL, progress) * (1 - smoothstep(SIDE_PREVIEW_FADE_START, SIDE_PREVIEW_FADE_END, progress));
-  const centerReveal = smoothstep(CENTER_READING_START, CENTER_READING_FULL, progress);
-  const inSidePreview = sideReveal > 0.01 && centerReveal < 0.02;
-  const reveal = Math.max(sideReveal, centerReveal);
-
-  surface.classList.toggle('mhc-book-side-preview', inSidePreview);
-  surface.classList.toggle('mhc-centered-book-content', !inSidePreview && centerReveal > 0.02);
-  surface.style.setProperty('--side-preview-y', `${((1 - sideReveal) * 18).toFixed(1)}px`);
+  const centerReveal = smoothstep(OPEN_READING_START, OPEN_READING_FULL, progress);
+  surface.classList.toggle('mhc-centered-book-content', centerReveal > 0.02);
 
   const centeredChapters = chapters
     .map((chapter) => Number(chapter.dataset.chapter || 0))
@@ -271,22 +291,19 @@ function updateBibleContent(delta) {
   const firstCentered = centeredChapters[0] || 1;
   const lastCentered = centeredChapters[centeredChapters.length - 1] || firstCentered;
   const chapterProgress = smoothstep(CHAPTER_SCROLL_START, CHAPTER_SCROLL_END, progress);
-  const goalCursor = inSidePreview ? 0 : firstCentered + chapterProgress * Math.max(0, lastCentered - firstCentered);
+  const goalCursor = firstCentered + chapterProgress * Math.max(0, lastCentered - firstCentered);
   renderedChapterCursor = damp(renderedChapterCursor, goalCursor, CHAPTER_DAMPING, delta);
 
-  overlay.style.setProperty('--page-overlay-opacity', reveal.toFixed(3));
-  overlay.classList.toggle('is-readable', reveal > 0.45);
-  surface.style.setProperty('--page-overlay-opacity', reveal.toFixed(3));
+  overlay.style.setProperty('--page-overlay-opacity', centerReveal.toFixed(3));
+  overlay.classList.toggle('is-readable', centerReveal > 0.45);
+  surface.style.setProperty('--page-overlay-opacity', centerReveal.toFixed(3));
   surface.style.setProperty('--safe-border-opacity', '0');
 
   chapters.forEach((chapter) => {
     const index = Number(chapter.dataset.chapter || 0);
-    let chapterOpacity = 0;
-    if (inSidePreview) {
-      chapterOpacity = index === 0 ? sideReveal : 0;
-    } else if (centerReveal > 0.02 && index > 0) {
-      chapterOpacity = smoothstep(0, 1, clamp(1 - Math.abs(renderedChapterCursor - index), 0, 1)) * centerReveal;
-    }
+    const chapterOpacity = index > 0
+      ? smoothstep(0, 1, clamp(1 - Math.abs(renderedChapterCursor - index), 0, 1)) * centerReveal
+      : 0;
     chapter.style.setProperty('--chapter-opacity', chapterOpacity.toFixed(3));
     chapter.style.setProperty('--chapter-shift', `${((index - renderedChapterCursor) * 16).toFixed(1)}px`);
     chapter.classList.toggle('is-active', chapterOpacity > 0.45);
@@ -294,13 +311,21 @@ function updateBibleContent(delta) {
   });
 }
 
+function updateTimeline(delta) {
+  ensureProductionStageStyles();
+  const progress = journeyProgress();
+  updateHero(progress);
+  updateClosedBookIntro(progress);
+  updateOpenBookContent(progress, delta);
+}
+
 function runAfterSceneFrame() {
   afterFrameQueued = false;
   const now = performance.now();
   const delta = Math.min(0.05, (now - lastTime) / 1000 || 1 / 60);
   lastTime = now;
-  setupEnterNavigation();
-  updateBibleContent(delta);
+  setupNavigation();
+  updateTimeline(delta);
 }
 
 function tick() {
