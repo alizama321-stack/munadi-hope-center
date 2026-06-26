@@ -123,8 +123,8 @@ export const APPROVED_SEQUENCE_CONFIG = {
   },
   opening: {
     clipTimeRatio: 0.5,
-    scrollStart: 0.82,
-    scrollEnd: 0.98,
+    scrollStart: 0.62,
+    scrollEnd: 0.74,
   },
   smoothing: {
     cameraDamping: 5.2,
@@ -186,9 +186,14 @@ export const APPROVED_SEQUENCE_CONFIG = {
     },
   },
   content: {
-    start: 0.88,
-    end: 1,
-    pageCoverStart: 0.82,
-    pageCoverEnd: 0.96,
+    revealStart: 0.72,
+    revealEnd: 0.79,
+    chapterStart: 0.8,
+    chapterEnd: 1,
+    pageCoverStart: 0.62,
+    pageCoverEnd: 0.78,
+  },
+  navigation: {
+    enterTargetProgress: 0.78,
   },
 };
