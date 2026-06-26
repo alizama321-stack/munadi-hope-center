@@ -5,9 +5,9 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { APPROVED_BOOK_TRANSFORMS, APPROVED_SEQUENCE_CONFIG } from '../src/approved-sequence-config.js';
 
 const ASSETS = {
-  book: '/public/assets/models/book_animated_book__historical_book.glb',
-  lectern: '/public/assets/models/optimized/lectern.glb',
-  church: '/public/assets/models/optimized/st_bartholomew-the-less_interior.glb',
+  book: '/assets/models/book_animated_book__historical_book.glb',
+  lectern: '/assets/models/optimized/lectern.glb',
+  church: '/assets/models/optimized/st_bartholomew-the-less_interior.glb',
 };
 
 const DEBUG_MODE = new URLSearchParams(window.location.search).get('debug') === '1';

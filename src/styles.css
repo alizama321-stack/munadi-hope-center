@@ -473,6 +473,37 @@ main,
   pointer-events: auto;
 }
 
+.scene-fallback-active .cinematic-scene {
+  position: fixed;
+}
+
+.scene-fallback-active .journey-stage {
+  min-height: 180vh;
+}
+
+.page-content-overlay.is-fallback {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: clamp(6rem, 12vh, 8rem) clamp(1rem, 4vw, 2rem) 3rem;
+  pointer-events: auto;
+}
+
+.page-content-overlay.is-fallback .bible-content-surface {
+  position: relative;
+  left: auto;
+  top: auto;
+  width: min(920px, calc(100vw - 2rem));
+  height: auto;
+  min-height: min(560px, calc(100vh - 8rem));
+  transform: none;
+  opacity: 1;
+  mask-image: none;
+}
+
 .bible-chapter {
   position: absolute;
   inset: calc(var(--page-content-padding, 0.2rem) + clamp(0.76rem, 1.5vw, 1.25rem));

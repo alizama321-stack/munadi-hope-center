@@ -7,10 +7,10 @@ const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matc
 const lowPowerViewport = window.matchMedia('(max-width: 720px)').matches;
 
 const ASSETS = {
-  door: '/public/assets/models/optimized/wooden_church_door.glb',
-  book: '/public/assets/models/book_animated_book__historical_book.glb',
-  lectern: '/public/assets/models/optimized/lectern.glb',
-  church: '/public/assets/models/optimized/st_bartholomew-the-less_interior.glb',
+  door: '/assets/models/optimized/wooden_church_door.glb',
+  book: '/assets/models/book_animated_book__historical_book.glb',
+  lectern: '/assets/models/optimized/lectern.glb',
+  church: '/assets/models/optimized/st_bartholomew-the-less_interior.glb',
 };
 
 const LECTERN_TRANSFORM = APPROVED_SEQUENCE_CONFIG.lectern;
@@ -99,6 +99,23 @@ function setStatus(message, state = '') {
   if (!status) return;
   status.textContent = message;
   status.dataset.state = state;
+}
+
+function showSceneFallback(message = 'The full 3D church scene could not load, but the Munadi Hope Center content is available below.') {
+  document.body.classList.add('scene-fallback-active');
+  setStatus(message, 'error');
+  updateHeroOverlay(1);
+  const overlay = document.getElementById('pageContentOverlay');
+  if (overlay) {
+    overlay.classList.add('is-readable', 'is-fallback');
+    overlay.style.setProperty('--page-overlay-opacity', '1');
+  }
+  const surface = document.getElementById('homeBibleContentSurface');
+  if (surface) {
+    surface.style.setProperty('--page-overlay-opacity', '1');
+    surface.style.setProperty('--safe-border-opacity', '0');
+  }
+  updateBibleChapters(1, 1, 1 / 60, true);
 }
 
 function cloneMaterial(material) {
@@ -724,8 +741,7 @@ async function setupScene() {
     updateScene(desiredProgress, 1 / 60, true);
     requestAnimationFrame(render);
   } catch (error) {
-    console.error(error);
-    setStatus(`Scene failed to load: ${error.message}`, 'error');
+    showSceneFallback('We could not load the full 3D church scene. The Bible chapters are still available.');
   }
 }
 
@@ -782,7 +798,15 @@ function setupBiblePageForm() {
 
 document.documentElement.style.scrollBehavior = reducedMotion ? 'auto' : 'smooth';
 
-setupScene();
+const startScene = () => {
+  setupScene();
+};
+
+if ('requestIdleCallback' in window) {
+  window.requestIdleCallback(startScene, { timeout: 900 });
+} else {
+  window.setTimeout(startScene, 80);
+}
 setupNavSpy();
 setupAnchorNavigation();
 setupBiblePageForm();

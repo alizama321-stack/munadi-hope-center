@@ -2,8 +2,12 @@
   "name": "munadi-hope-center",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.7.0",
   "description": "Munadi Hope Center cinematic website prototype asset pipeline.",
   "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build && node scripts/prune-dist-originals.mjs",
+    "preview": "vite preview --host 0.0.0.0",
     "optimize:models": "pnpm run optimize:models:biblia && pnpm run optimize:models:open-bible && pnpm run optimize:models:lectern && pnpm run optimize:models:door && pnpm run optimize:models:interior",
     "optimize:models:biblia": "gltf-transform optimize public/assets/models/original/biblia.glb public/assets/models/optimized/biblia.glb --compress meshopt --meshopt-level high --texture-compress webp --texture-size 2048",
     "optimize:models:open-bible": "gltf-transform optimize public/assets/models/original/open_bible.glb public/assets/models/optimized/open_bible.glb --compress meshopt --meshopt-level high --texture-compress webp --texture-size 2048",
@@ -13,6 +17,10 @@
   },
   "devDependencies": {
     "@gltf-transform/cli": "^4.4.0",
-    "sharp": "^0.35.2"
+    "sharp": "^0.35.2",
+    "vite": "^8.1.0"
+  },
+  "dependencies": {
+    "three": "^0.185.0"
   }
 }

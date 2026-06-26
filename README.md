@@ -27,10 +27,10 @@ Install local tooling:
 pnpm install
 ```
 
-Run the current static prototype from the project root:
+Run the Vite dev server:
 
 ```bash
-python -m http.server 5173
+pnpm dev
 ```
 
 Then open:
@@ -39,10 +39,30 @@ Then open:
 http://127.0.0.1:5173/
 ```
 
+Build for production:
+
+```bash
+pnpm build
+```
+
+Preview the production build:
+
+```bash
+pnpm preview
+```
+
+Vercel should use:
+
+```text
+Build command: pnpm build
+Output directory: dist
+```
+
 ## Asset Strategy
 
 - Keep original assets in `public/assets/models/original/`.
 - Use `public/assets/models/optimized/` for web delivery.
+- Runtime URLs must omit `public`; for example use `/assets/models/optimized/lectern.glb`, not `/public/assets/models/optimized/lectern.glb`.
 - Do not embed massive base64 assets in HTML.
 - Use `biblia.glb` as the closed Bible.
 - Use `open_bible.glb` as the opened Bible.
@@ -105,7 +125,7 @@ Model-orientation notes:
 Implementation notes:
 
 - The canvas is fixed and persistent across the page, not boxed inside the hero.
-- Models are loaded from `public/assets/models/optimized/`.
+- Models are loaded from `/assets/models/optimized/` in the browser. Vite/Vercel publish files from `public/` at the site root.
 - The optimized files use meshopt compression, so the loader uses `MeshoptDecoder`.
 - Camera timeline points are named and commented in `src/main.js` for tuning.
 - `src/main.js` now uses a `LecternSurface` anchor and a child `BibleRig` so the closed and open Bible share the same physical anchor on the lectern.
