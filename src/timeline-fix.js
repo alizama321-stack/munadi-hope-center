@@ -3,6 +3,8 @@
 // This prevents visitors from landing on the last chapter as soon as the Bible zoom finishes.
 
 const CAMERA_READING_TARGET = 0.78;
+const HERO_FADE_START = 0.56;
+const HERO_FADE_END = 0.69;
 const CONTENT_REVEAL_START = 0.72;
 const CONTENT_REVEAL_END = 0.8;
 const CHAPTER_SCROLL_START = 0.82;
@@ -62,6 +64,19 @@ function setupEnterNavigation() {
   );
 }
 
+function updateHeroLockout(progress) {
+  const hero = document.getElementById('heroCopy');
+  if (!hero) return;
+
+  // Main scene code fades the hero too late. Override it so the Bible content has a clean stage.
+  const fadeOut = smoothstep(HERO_FADE_START, HERO_FADE_END, progress);
+  const opacity = 1 - fadeOut;
+  hero.style.opacity = opacity.toFixed(3);
+  hero.style.transform = `translate3d(0, ${(-34 * fadeOut).toFixed(1)}px, 0)`;
+  hero.style.pointerEvents = opacity > 0.35 ? 'auto' : 'none';
+  hero.setAttribute('aria-hidden', opacity > 0.05 ? 'false' : 'true');
+}
+
 function updateBibleContent(delta) {
   const chapters = [...document.querySelectorAll('.bible-chapter')];
   const overlay = document.getElementById('pageContentOverlay');
@@ -69,6 +84,8 @@ function updateBibleContent(delta) {
   if (!chapters.length || !overlay || !surface) return;
 
   const progress = journeyProgress();
+  updateHeroLockout(progress);
+
   const reveal = smoothstep(CONTENT_REVEAL_START, CONTENT_REVEAL_END, progress);
 
   // The content should appear when the Bible is framed, but Chapter 1 should hold first.
