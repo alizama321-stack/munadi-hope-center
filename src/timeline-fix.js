@@ -10,12 +10,13 @@ const HERO_FADE_END = 0.54;
 const CONTENT_REVEAL_START = 0.72;
 const CONTENT_REVEAL_END = 0.8;
 const CHAPTER_SCROLL_START = 0.82;
-const CHAPTER_SCROLL_END = 1;
-const CHAPTER_DAMPING = 8;
+const CHAPTER_SCROLL_END = 0.98;
+const CHAPTER_DAMPING = 5.2;
 
 let renderedChapterCursor = 0;
 let lastTime = performance.now();
 let capturedNavigation = false;
+let afterFrameQueued = false;
 
 function clamp(value, min = 0, max = 1) {
   return Math.max(min, Math.min(max, value));
@@ -66,11 +67,15 @@ function setupEnterNavigation() {
   );
 }
 
-function ensureHeroStageStyles() {
-  if (document.getElementById('mhc-hero-stage-style')) return;
+function ensureProductionStageStyles() {
+  if (document.getElementById('mhc-production-stage-style')) return;
   const style = document.createElement('style');
-  style.id = 'mhc-hero-stage-style';
+  style.id = 'mhc-production-stage-style';
   style.textContent = `
+    .journey-stage {
+      min-height: 2200vh !important;
+    }
+
     #heroCopy.mhc-hero-stage {
       position: fixed !important;
       left: 50% !important;
@@ -102,6 +107,39 @@ function ensureHeroStageStyles() {
       justify-content: center !important;
       width: 100% !important;
     }
+
+    #homeBibleContentSurface.mhc-centered-book-content {
+      position: fixed !important;
+      left: 50% !important;
+      top: 52% !important;
+      width: min(1500px, 86vw) !important;
+      height: min(650px, 70vh) !important;
+      transform: translate(-50%, -50%) rotate(0deg) !important;
+      transform-origin: center !important;
+      border-radius: 10px !important;
+      opacity: var(--page-overlay-opacity, 0) !important;
+      transition: opacity 0.32s ease !important;
+    }
+    #homeBibleContentSurface.mhc-centered-book-content .bible-chapter {
+      inset: clamp(1.6rem, 3vw, 3.1rem) !important;
+      justify-content: center !important;
+    }
+    #homeBibleContentSurface.mhc-centered-book-content .chapter-grid {
+      grid-template-columns: minmax(0, 1fr) minmax(240px, 0.8fr) !important;
+      gap: clamp(1rem, 3vw, 3rem) !important;
+      align-items: center !important;
+    }
+    #homeBibleContentSurface.mhc-centered-book-content .bible-chapter h2 {
+      font-size: clamp(1.55rem, 2.65vw, 3rem) !important;
+    }
+    #homeBibleContentSurface.mhc-centered-book-content .bible-chapter p,
+    #homeBibleContentSurface.mhc-centered-book-content .bible-chapter li,
+    #homeBibleContentSurface.mhc-centered-book-content .bible-chapter dd {
+      font-size: clamp(0.78rem, 1.05vw, 1.08rem) !important;
+    }
+    #homeBibleContentSurface.mhc-centered-book-content .page-btn {
+      min-width: min(380px, 100%) !important;
+    }
   `;
   document.head.appendChild(style);
 }
@@ -110,7 +148,7 @@ function updateHeroLockout(progress) {
   const hero = document.getElementById('heroCopy');
   if (!hero) return;
 
-  ensureHeroStageStyles();
+  ensureProductionStageStyles();
   hero.classList.add('mhc-hero-stage');
 
   // The hero belongs to the aisle reveal, before the lectern/book closeup.
@@ -131,10 +169,13 @@ function updateBibleContent(delta) {
   const surface = document.getElementById('homeBibleContentSurface');
   if (!chapters.length || !overlay || !surface) return;
 
+  ensureProductionStageStyles();
+
   const progress = journeyProgress();
   updateHeroLockout(progress);
 
   const reveal = smoothstep(CONTENT_REVEAL_START, CONTENT_REVEAL_END, progress);
+  surface.classList.toggle('mhc-centered-book-content', reveal > 0.02);
 
   // The content should appear when the Bible is framed, but Chapter 1 should hold first.
   const chapterProgress = smoothstep(CHAPTER_SCROLL_START, CHAPTER_SCROLL_END, progress);
@@ -157,11 +198,20 @@ function updateBibleContent(delta) {
   });
 }
 
-function tick(now) {
+function runAfterSceneFrame() {
+  afterFrameQueued = false;
+  const now = performance.now();
   const delta = Math.min(0.05, (now - lastTime) / 1000 || 1 / 60);
   lastTime = now;
   setupEnterNavigation();
   updateBibleContent(delta);
+}
+
+function tick() {
+  if (!afterFrameQueued) {
+    afterFrameQueued = true;
+    setTimeout(runAfterSceneFrame, 0);
+  }
   requestAnimationFrame(tick);
 }
 
