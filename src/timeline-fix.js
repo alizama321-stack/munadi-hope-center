@@ -1,8 +1,9 @@
 // Runtime production timeline fix.
 // Separates the closed-book Chapter 1 intro from the open-Bible website chapters.
+// After Chapter 1, the book finishes opening/zooming first. Then the website chapters appear and scroll normally.
 
 const ENTER_TARGET = 0.55;
-const OPEN_BOOK_TARGET = 0.74;
+const OPEN_BOOK_TARGET = 0.84;
 
 const HERO_REVEAL_START = 0.16;
 const HERO_REVEAL_END = 0.26;
@@ -16,13 +17,14 @@ const CLOSED_INTRO_FADE_START = 0.59;
 const CLOSED_INTRO_END = 0.62;
 
 // Open-book reading stage. It intentionally skips Chapter 1.
-const OPEN_READING_START = 0.74;
-const OPEN_READING_FULL = 0.82;
-const CHAPTER_SCROLL_START = 0.80;
-const CHAPTER_SCROLL_END = 0.98;
-const CHAPTER_DAMPING = 5.2;
+// The content starts after the zoom/opening has visually settled.
+const OPEN_READING_START = 0.84;
+const OPEN_READING_FULL = 0.89;
+const CHAPTER_SCROLL_START = 0.89;
+const CHAPTER_SCROLL_END = 0.995;
+const OPEN_CONTENT_DAMPING = 6.4;
 
-let renderedChapterCursor = 1;
+let renderedReadingProgress = 0;
 let lastTime = performance.now();
 let capturedNavigation = false;
 let afterFrameQueued = false;
@@ -110,7 +112,7 @@ function ensureProductionStageStyles() {
   style.id = 'mhc-production-stage-style';
   style.textContent = `
     .journey-stage {
-      min-height: 1500vh !important;
+      min-height: 1700vh !important;
     }
 
     #heroCopy.mhc-hero-stage {
@@ -211,7 +213,7 @@ function ensureProductionStageStyles() {
       transform-origin: center !important;
       border-radius: 10px !important;
       opacity: var(--page-overlay-opacity, 0) !important;
-      transition: opacity 0.32s ease !important;
+      transition: opacity 0.4s ease !important;
     }
     #homeBibleContentSurface .bible-chapter[data-chapter="0"] {
       display: none !important;
@@ -221,6 +223,10 @@ function ensureProductionStageStyles() {
     #homeBibleContentSurface.mhc-centered-book-content .bible-chapter {
       inset: clamp(1.6rem, 3vw, 3.1rem) !important;
       justify-content: center !important;
+      opacity: var(--chapter-opacity, 0) !important;
+      transform: translate3d(0, var(--chapter-shift, 0px), 0) !important;
+      transition: none !important;
+      will-change: opacity, transform !important;
     }
     #homeBibleContentSurface.mhc-centered-book-content .chapter-grid {
       grid-template-columns: minmax(0, 1fr) minmax(240px, 0.8fr) !important;
@@ -275,37 +281,50 @@ function updateClosedBookIntro(progress) {
   return opacity;
 }
 
+function openChapterOpacity(readingProgress, ordinal, count) {
+  if (count <= 1) return 1;
+
+  const segment = 1 / count;
+  const start = ordinal * segment;
+  const end = (ordinal + 1) * segment;
+  const fade = Math.min(0.04, segment * 0.22);
+
+  const fadeIn = smoothstep(start, start + fade, readingProgress);
+  const fadeOut = 1 - smoothstep(end - fade, end, readingProgress);
+  return clamp(fadeIn * fadeOut);
+}
+
 function updateOpenBookContent(progress, delta) {
   const chapters = [...document.querySelectorAll('.bible-chapter')];
   const overlay = document.getElementById('pageContentOverlay');
   const surface = document.getElementById('homeBibleContentSurface');
   if (!chapters.length || !overlay || !surface) return;
 
-  const centerReveal = smoothstep(OPEN_READING_START, OPEN_READING_FULL, progress);
-  surface.classList.toggle('mhc-centered-book-content', centerReveal > 0.02);
+  const openReveal = smoothstep(OPEN_READING_START, OPEN_READING_FULL, progress);
+  surface.classList.toggle('mhc-centered-book-content', openReveal > 0.02);
 
-  const centeredChapters = chapters
-    .map((chapter) => Number(chapter.dataset.chapter || 0))
-    .filter((index) => index > 0)
-    .sort((a, b) => a - b);
-  const firstCentered = centeredChapters[0] || 1;
-  const lastCentered = centeredChapters[centeredChapters.length - 1] || firstCentered;
-  const chapterProgress = smoothstep(CHAPTER_SCROLL_START, CHAPTER_SCROLL_END, progress);
-  const goalCursor = firstCentered + chapterProgress * Math.max(0, lastCentered - firstCentered);
-  renderedChapterCursor = damp(renderedChapterCursor, goalCursor, CHAPTER_DAMPING, delta);
+  const targetReadingProgress = smoothstep(CHAPTER_SCROLL_START, CHAPTER_SCROLL_END, progress);
+  renderedReadingProgress = damp(renderedReadingProgress, targetReadingProgress, OPEN_CONTENT_DAMPING, delta);
 
-  overlay.style.setProperty('--page-overlay-opacity', centerReveal.toFixed(3));
-  overlay.classList.toggle('is-readable', centerReveal > 0.45);
-  surface.style.setProperty('--page-overlay-opacity', centerReveal.toFixed(3));
+  const openChapters = chapters
+    .map((chapter) => ({ element: chapter, index: Number(chapter.dataset.chapter || 0) }))
+    .filter((item) => item.index > 0)
+    .sort((a, b) => a.index - b.index);
+
+  overlay.style.setProperty('--page-overlay-opacity', openReveal.toFixed(3));
+  overlay.classList.toggle('is-readable', openReveal > 0.45);
+  surface.style.setProperty('--page-overlay-opacity', openReveal.toFixed(3));
   surface.style.setProperty('--safe-border-opacity', '0');
 
   chapters.forEach((chapter) => {
     const index = Number(chapter.dataset.chapter || 0);
-    const chapterOpacity = index > 0
-      ? smoothstep(0, 1, clamp(1 - Math.abs(renderedChapterCursor - index), 0, 1)) * centerReveal
-      : 0;
+    const ordinal = openChapters.findIndex((item) => item.index === index);
+    const sectionOpacity = ordinal >= 0 ? openChapterOpacity(renderedReadingProgress, ordinal, openChapters.length) : 0;
+    const chapterOpacity = sectionOpacity * openReveal;
+    const chapterShift = ordinal >= 0 ? (ordinal / Math.max(1, openChapters.length - 1) - renderedReadingProgress) * 24 : 0;
+
     chapter.style.setProperty('--chapter-opacity', chapterOpacity.toFixed(3));
-    chapter.style.setProperty('--chapter-shift', `${((index - renderedChapterCursor) * 16).toFixed(1)}px`);
+    chapter.style.setProperty('--chapter-shift', `${chapterShift.toFixed(1)}px`);
     chapter.classList.toggle('is-active', chapterOpacity > 0.45);
     chapter.setAttribute('aria-hidden', chapterOpacity > 0.12 ? 'false' : 'true');
   });
