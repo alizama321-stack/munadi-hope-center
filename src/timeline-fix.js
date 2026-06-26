@@ -3,8 +3,10 @@
 // This prevents visitors from landing on the last chapter as soon as the Bible zoom finishes.
 
 const CAMERA_READING_TARGET = 0.78;
-const HERO_FADE_START = 0.56;
-const HERO_FADE_END = 0.69;
+const HERO_REVEAL_START = 0.16;
+const HERO_REVEAL_END = 0.26;
+const HERO_FADE_START = 0.48;
+const HERO_FADE_END = 0.62;
 const CONTENT_REVEAL_START = 0.72;
 const CONTENT_REVEAL_END = 0.8;
 const CHAPTER_SCROLL_START = 0.82;
@@ -64,15 +66,52 @@ function setupEnterNavigation() {
   );
 }
 
+function applyCenteredHeroStage(hero) {
+  hero.style.position = 'fixed';
+  hero.style.left = '50%';
+  hero.style.top = '49%';
+  hero.style.width = 'min(760px, calc(100vw - 3rem))';
+  hero.style.maxWidth = '760px';
+  hero.style.zIndex = '6';
+  hero.style.alignItems = 'center';
+  hero.style.textAlign = 'center';
+  hero.style.gap = '1rem';
+
+  const eyebrow = hero.querySelector('.eyebrow');
+  const title = hero.querySelector('h1');
+  const lede = hero.querySelector('.lede');
+  const actions = hero.querySelector('.hero-actions');
+
+  if (eyebrow) eyebrow.style.justifyContent = 'center';
+  if (title) {
+    title.style.maxWidth = '12ch';
+    title.style.fontSize = 'clamp(2.7rem, 5.5vw, 5.9rem)';
+    title.style.textAlign = 'center';
+  }
+  if (lede) {
+    lede.style.maxWidth = 'min(54ch, 100%)';
+    lede.style.textAlign = 'center';
+  }
+  if (actions) {
+    actions.style.justifyContent = 'center';
+    actions.style.width = '100%';
+  }
+}
+
 function updateHeroLockout(progress) {
   const hero = document.getElementById('heroCopy');
   if (!hero) return;
 
-  // Main scene code fades the hero too late. Override it so the Bible content has a clean stage.
+  applyCenteredHeroStage(hero);
+
+  // The hero belongs to the aisle reveal: it appears after entry and leaves before the Bible stage.
+  const reveal = smoothstep(HERO_REVEAL_START, HERO_REVEAL_END, progress);
   const fadeOut = smoothstep(HERO_FADE_START, HERO_FADE_END, progress);
-  const opacity = 1 - fadeOut;
+  const opacity = reveal * (1 - fadeOut);
+  const lift = -18 * reveal - 34 * fadeOut;
+
   hero.style.opacity = opacity.toFixed(3);
-  hero.style.transform = `translate3d(0, ${(-34 * fadeOut).toFixed(1)}px, 0)`;
+  hero.style.transform = `translate(-50%, -50%) translate3d(0, ${lift.toFixed(1)}px, 0)`;
   hero.style.pointerEvents = opacity > 0.35 ? 'auto' : 'none';
   hero.setAttribute('aria-hidden', opacity > 0.05 ? 'false' : 'true');
 }
